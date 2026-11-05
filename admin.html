@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>드론 실험 결과 관리</title>
+<style>
+:root{
+  /* 실험앱과 같은 팔레트: 창고 회색 바탕, 짙은 남색 글자, 호박색 강조 */
+  --bg:#eef0ec; --surface:#fbfbf9; --ink:#1d2a33; --muted:#5d6a72; --line:#d5d9d4;
+  --accent:#d98e04; --accent-soft:#fbecc9; --ok:#2f7d5b; --ok-soft:#e3f1ea; --bad:#b4442f; --bad-soft:#f7e4df;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1280px;margin:0 auto;padding:24px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+h1{font-size:22px;font-weight:750;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:13px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button,select,input{font:inherit}
+.btn{min-height:40px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:650;cursor:pointer}
+.btn:hover{background:#f3f4f1}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.primary:hover{background:#2c3e4a}
+.btn.danger{color:var(--bad);border-color:#e3c3bb}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+select,input[type=search]{min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+.uid{font-family:var(--mono);font-size:13px;background:#f3f4f1;border:1px solid var(--line);border-radius:6px;padding:3px 8px;word-break:break-all}
+.msg{border-radius:10px;padding:12px 14px;font-size:14px}
+.msg.info{background:var(--accent-soft)}
+.msg.err{background:var(--bad-soft);color:#6e2618}
+.msg.ok{background:var(--ok-soft);color:#1f5a40}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:#fff}
+.stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{padding:8px 10px;border-bottom:1px solid #e7e9e5;text-align:left;white-space:nowrap}
+th{background:#f3f4f1;font-weight:700;position:sticky;top:0}
+td.num{text-align:right}
+tr.dup td{background:#fff7e2}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.c0{background:#e3ecf3;color:#1f4a66}.c1{background:#fbecc9;color:#7a5200}.c2{background:#efe3f3;color:#5b2a6b}
+.flag{color:var(--bad);font-weight:700}
+.muted{color:var(--muted)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>드론 실험 결과 관리</h1>
+      <p class="sub">연구자 전용 페이지입니다. 참가자에게 이 주소를 보내지 마세요.</p>
+    </div>
+    <div class="row" id="who" hidden>
+      <span class="sub" id="who-email"></span>
+      <button class="btn" id="b-logout">로그아웃</button>
+    </div>
+  </header>
+
+  <section class="card" id="login-card">
+    <p style="margin-bottom:12px">실험 결과를 보려면 연구자 Google 계정으로 로그인하세요.</p>
+    <button class="btn primary" id="b-login">Google 계정으로 로그인</button>
+    <div class="msg err" id="login-err" style="margin-top:12px" hidden></div>
+  </section>
+
+  <section class="card" id="uid-card" hidden>
+    <p style="margin-bottom:8px">로그인한 계정의 UID</p>
+    <div class="row"><span class="uid" id="uid"></span><button class="btn" id="b-copy-uid">복사</button></div>
+    <div class="msg info" id="rules-help" style="margin-top:12px" hidden>
+      아직 이 계정에 열람 권한이 없습니다. Firebase 콘솔 → Firestore → <b>규칙</b> 탭에서 <code>여기에_연구자_UID</code>를 위 UID로 바꾸고 <b>게시</b>를 누른 뒤, 이 페이지를 새로고침하세요.
+    </div>
+  </section>
+
+  <div id="data-area" hidden>
+    <section class="card">
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="row">
+          <label class="sub" for="f-cond">조건</label>
+          <select id="f-cond">
+            <option value="">전체</option>
+            <option value="0">0 · 고신뢰</option>
+            <option value="1">1 · 초기 오류</option>
+            <option value="2">2 · 후기 오류</option>
+          </select>
+          <label class="sub" for="f-ver">버전</label>
+          <select id="f-ver"><option value="">전체</option></select>
+          <input type="search" id="f-q" placeholder="뒷자리·전화번호 검색" aria-label="뒷자리 또는 전화번호 검색">
+          <button class="btn" id="b-reload">새로고침</button>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="b-dl-sum">summary CSV 받기</button>
+          <button class="btn" id="b-dl-ev">events CSV 받기</button>
+          <button class="btn danger" id="b-del-vis">보이는 결과 모두 삭제</button>
+        </div>
+      </div>
+      <p class="sub" style="margin-top:10px">CSV 받기와 모두 삭제는 지금 표에 보이는 행에만 적용됩니다(조건·버전·검색 적용). 노란 행은 같은 전화번호가 두 번 이상 있는 참여입니다. 중복 참여일 수 있으니 확인하세요.</p>
+    </section>
+
+    <div class="msg" id="data-msg" hidden></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>저장 시각</th><th>뒷자리</th><th>전화번호</th><th>조건</th>
+        <th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th><th>T8</th>
+        <th>자유시행 지도확인</th><th>주의점검</th><th>빠른응답</th><th>소요(초)</th><th>버전</th><th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<script type="module">
+/* 실험앱(index.html)과 같은 Firebase 설정 */
+const firebaseConfig = {
+  apiKey: "AIzaSyBUlL0re9lbLBi3LdyN2I6AqScUsQ2TbGQ",
+  authDomain: "drone-experiment.firebaseapp.com",
+  projectId: "drone-experiment",
+  storageBucket: "drone-experiment.firebasestorage.app",
+  messagingSenderId: "1000116659969",
+  appId: "1:1000116659969:web:8faf57fdc7cac312181d00"
+};
+const COLLECTION = "participants";
+const CONDS = ["고신뢰", "초기 오류", "후기 오류"];
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = id => document.getElementById(id);
+let ROWS = [];
+
+$('b-login').onclick = async () => {
+  $('login-err').hidden = true;
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) {
+    const why = {
+      "auth/popup-blocked": "브라우저가 로그인 창을 막았습니다. 주소창의 팝업 차단 표시를 눌러 허용한 뒤 다시 시도하세요.",
+      "auth/unauthorized-domain": "이 주소가 Firebase의 승인된 도메인에 없습니다. Firebase 콘솔 → Authentication → 설정 → 승인된 도메인에 이 사이트 주소를 추가하세요.",
+      "auth/operation-not-allowed": "Google 로그인이 꺼져 있습니다. Firebase 콘솔 → Authentication → 로그인 방법에서 Google을 사용 설정하세요.",
+      "auth/popup-closed-by-user": "로그인 창이 닫혔습니다. 다시 시도하세요."
+    }[e.code] || `로그인하지 못했습니다 (${e.code || e.message}).`;
+    $('login-err').textContent = why; $('login-err').hidden = false;
+  }
+};
+$('b-logout').onclick = () => signOut(auth);
+$('b-copy-uid').onclick = async () => {
+  try { await navigator.clipboard.writeText($('uid').textContent); $('b-copy-uid').textContent = "복사됨"; }
+  catch (e) { const r = document.createRange(); r.selectNodeContents($('uid')); getSelection().removeAllRanges(); getSelection().addRange(r); }
+};
+
+onAuthStateChanged(auth, user => {
+  const inn = !!user;
+  $('login-card').hidden = inn; $('who').hidden = !inn; $('uid-card').hidden = !inn;
+  $('data-area').hidden = true; $('rules-help').hidden = true;
+  if (!inn) return;
+  $('who-email').textContent = user.email || "";
+  $('uid').textContent = user.uid;
+  loadData();
+});
+
+function setMsg(kind, text){ const m = $('data-msg'); m.className = "msg " + kind; m.textContent = text; m.hidden = !text; m.style.marginBottom = "14px"; }
+
+async function loadData(){
+  $('b-reload').disabled = true;
+  try {
+    const snap = await getDocs(query(collection(db, COLLECTION), orderBy("created_at", "desc")));
+    ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    $('data-area').hidden = false; $('rules-help').hidden = true;
+    setMsg(ROWS.length ? "" : "info", ROWS.length ? "" : "아직 저장된 결과가 없습니다. 실험앱에서 참가자가 끝까지 마치면 여기에 나타납니다.");
+    render();
+  } catch (e) {
+    if (e.code === "permission-denied") { $('rules-help').hidden = false; $('data-area').hidden = true; }
+    else { $('data-area').hidden = false; setMsg("err", `결과를 불러오지 못했습니다 (${e.code || e.message}). 인터넷 연결을 확인하고 새로고침하세요.`); }
+  } finally { $('b-reload').disabled = false; }
+}
+
+function visible(){
+  const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, "");
+  return ROWS.filter(r => (c === "" || String(r.condition) === c) && (v === "" || String(r.app_version) === v) && (!q || String(r.pid).includes(q) || String(r.phone || "").replace(/\D/g, "").includes(q)));
+}
+function fmtTime(ts){ try { return ts && ts.toDate ? ts.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "medium" }) : ""; } catch (e) { return ""; } }
+function esc(v){ return String(v ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
+
+function fillVersions(){
+  const sel = $('f-ver'), cur = sel.value;
+  const vers = [...new Set(ROWS.map(r => String(r.app_version || "")))].filter(Boolean).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  sel.innerHTML = `<option value="">전체</option>` + vers.map(v => `<option value="${esc(v)}">${esc(v)} (${ROWS.filter(r => String(r.app_version) === v).length}건)</option>`).join("");
+  sel.value = vers.includes(cur) ? cur : "";
+}
+function render(){
+  fillVersions();
+  const phones = {}; ROWS.forEach(r => { const p = r.phone || ""; if (p) phones[p] = (phones[p] || 0) + 1; });
+  const n = [0, 1, 2].map(c => ROWS.filter(r => r.condition === c).length);
+  const dupN = Object.values(phones).filter(x => x > 1).length;
+  $('stats').innerHTML =
+    `<div class="stat"><b>${ROWS.length}</b><span>전체 참여</span></div>` +
+    n.map((k, i) => `<div class="stat"><b>${k}</b><span>조건 ${i} · ${CONDS[i]}</span></div>`).join("") +
+    `<div class="stat"><b>${dupN}</b><span>중복 의심 전화번호</span></div>`;
+  const rows = visible();
+  $('tbody').innerHTML = rows.map(r => {
+    const s = r.summary || {};
+    const dup = r.phone && phones[r.phone] > 1;
+    const attn = s.attn_pass === 1 || s.attn_pass === "1" ? "통과" : `<span class="flag">실패</span>`;
+    return `<tr class="${dup ? "dup" : ""}">
+      <td>${esc(fmtTime(r.created_at))}</td><td>${esc(r.pid)}</td><td>${esc(r.phone)}</td>
+      <td><span class="pill c${esc(r.condition)}">${esc(r.condition)} · ${esc(CONDS[r.condition] || "")}</span></td>
+      ${["T1","T2","T3","T4","T5","T6","T7","T8"].map(k => `<td class="num">${esc(s[k])}</td>`).join("")}
+      <td class="num">${esc(s.free_check_rate)}</td><td>${attn}</td><td class="num">${esc(s.fast_rt_rate)}</td>
+      <td class="num">${esc(s.total_time_s)}</td><td>${esc(r.app_version)}</td>
+      <td><div class="row" style="flex-wrap:nowrap;gap:6px">
+        <button class="btn" data-ev="${esc(r.id)}" style="min-height:32px;padding:0 10px">events</button>
+        <button class="btn danger" data-del="${esc(r.id)}" style="min-height:32px;padding:0 10px">삭제</button></div></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="18" class="muted" style="padding:18px">조건에 맞는 결과가 없습니다.</td></tr>`;
+}
+
+/* CSV */
+function csvCell(v){
+  if (v === undefined || v === null) return "";
+  let s = String(v);
+  // 스프레드시트 수식 주입 방지(OWASP): 숫자가 아닌 글자가 = + - @ 탭·줄바꿈으로 시작하면 앞에 ' 를 붙여 글자로 취급
+  if (typeof v === "string" && /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/.test(s) && !(s.trim() !== "" && Number.isFinite(Number(s)))) s = "'" + s;
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function save(name, text){
+  const url = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function stampNow(){ const d = new Date(), p = x => String(x).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
+function summaryCSV(rows){
+  const cols = []; rows.forEach(r => (r.summary_cols || Object.keys(r.summary || {})).forEach(c => { if (!cols.includes(c)) cols.push(c); }));
+  const head = ["doc_id", "saved_at", ...cols];
+  return [head.join(","), ...rows.map(r => [r.id, fmtTime(r.created_at), ...cols.map(c => (r.summary || {})[c])].map(csvCell).join(","))].join("\r\n");
+}
+function eventsCSV(rows){
+  let header = null; const out = []; let skipped = 0;
+  rows.forEach(r => {
+    const lines = String(r.events_csv || "").replace(/^﻿/, "").split("\r\n").filter(l => l !== "");
+    if (!lines.length) return;
+    if (header === null) { header = lines[0]; out.push(header); }
+    if (lines[0] !== header) { skipped++; return; }
+    out.push(...lines.slice(1));
+  });
+  return { text: out.join("\r\n"), skipped };
+}
+$('b-dl-sum').onclick = () => { const rows = visible(); if (rows.length) save(`summary_all_${stampNow()}.csv`, summaryCSV(rows)); };
+$('b-dl-ev').onclick = () => {
+  const rows = visible(); if (!rows.length) return;
+  const { text, skipped } = eventsCSV(rows); save(`events_all_${stampNow()}.csv`, text);
+  if (skipped) setMsg("info", `열 구성이 다른 버전의 결과 ${skipped}건은 합치지 않았습니다. 해당 행의 events 버튼으로 따로 받으세요.`);
+};
+$('tbody').addEventListener('click', async e => {
+  const ev = e.target.closest('[data-ev]'), del = e.target.closest('[data-del]');
+  if (ev) { const r = ROWS.find(x => x.id === ev.dataset.ev); if (r) save(`${r.id}_events.csv`, String(r.events_csv || "").replace(/^﻿/, "")); }
+  if (del) {
+    const r = ROWS.find(x => x.id === del.dataset.del); if (!r) return;
+    if (!confirm(`${r.pid} (${r.phone || "번호 없음"}) 결과를 영구 삭제할까요? 되돌릴 수 없습니다. 테스트 자료를 지울 때만 쓰세요.`)) return;
+    try { await deleteDoc(doc(db, COLLECTION, r.id)); ROWS = ROWS.filter(x => x.id !== r.id); render(); setMsg("ok", `${r.pid} 결과를 삭제했습니다.`); }
+    catch (err) { setMsg("err", `삭제하지 못했습니다 (${err.code || err.message}).`); }
+  }
+});
+$('b-del-vis').onclick = async () => {
+  const rows = visible(); if (!rows.length) return setMsg("info", "지울 결과가 없습니다.");
+  const v = $('f-ver').value, c = $('f-cond').value;
+  const scope = `${v ? "버전 " + v : "모든 버전"}, ${c === "" ? "모든 조건" : "조건 " + c}${$('f-q').value ? ", 검색어 적용" : ""}`;
+  if (!v && !c && !$('f-q').value && !confirm(`필터 없이 전체 ${rows.length}건이 선택되어 있습니다. 정말 전부 지우려는 것이 맞나요?`)) return;
+  const typed = prompt(`${scope} 결과 ${rows.length}건을 영구 삭제합니다. 되돌릴 수 없습니다.\n먼저 CSV를 받아 두었는지 확인하세요.\n\n계속하려면 "삭제"라고 입력하세요.`);
+  if (typed === null) return;
+  if (typed.trim() !== "삭제") return setMsg("info", "입력이 \"삭제\"와 달라 아무것도 지우지 않았습니다.");
+  const btn = $('b-del-vis'); btn.disabled = true; let done = 0, failed = 0;
+  for (const r of rows) {
+    try { await deleteDoc(doc(db, COLLECTION, r.id)); ROWS = ROWS.filter(x => x.id !== r.id); done++; }
+    catch (err) { failed++; }
+    btn.textContent = `삭제 중… ${done + failed}/${rows.length}`;
+  }
+  btn.disabled = false; btn.textContent = "보이는 결과 모두 삭제"; render();
+  setMsg(failed ? "err" : "ok", failed ? `${done}건을 삭제했고 ${failed}건은 지우지 못했습니다. 새로고침 후 다시 시도하세요.` : `${done}건을 삭제했습니다.`);
+};
+$('f-ver').onchange = render;
+$('f-cond').onchange = render; $('f-q').oninput = render; $('b-reload').onclick = loadData;
+</script>
+</body>
+</html>
