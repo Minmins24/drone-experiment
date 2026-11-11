@@ -7,16 +7,16 @@
 <title>드론 실험 결과 관리</title>
 <style>
 :root{
-  /* 실험앱과 같은 팔레트: 창고 회색 바탕, 짙은 남색 글자, 호박색 강조 */
   --bg:#eef0ec; --surface:#fbfbf9; --ink:#1d2a33; --muted:#5d6a72; --line:#d5d9d4;
   --accent:#d98e04; --accent-soft:#fbecc9; --ok:#2f7d5b; --ok-soft:#e3f1ea; --bad:#b4442f; --bad-soft:#f7e4df;
   --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1280px;margin:0 auto;padding:24px max(16px,env(safe-area-inset-right)) 48px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 48px}
 header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
-h1{font-size:22px;font-weight:750;letter-spacing:-.01em}
+h1{font-size:22px;font-weight:750}
+h2{font-size:16px;font-weight:750;margin-bottom:6px}
 .sub{color:var(--muted);font-size:13px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -24,103 +24,105 @@ button,select,input{font:inherit}
 .btn{min-height:40px;padding:0 16px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:650;cursor:pointer}
 .btn:hover{background:#f3f4f1}
 .btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
-.btn.primary:hover{background:#2c3e4a}
 .btn.danger{color:var(--bad);border-color:#e3c3bb}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 select,input[type=search]{min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
 .uid{font-family:var(--mono);font-size:13px;background:#f3f4f1;border:1px solid var(--line);border-radius:6px;padding:3px 8px;word-break:break-all}
-.msg{border-radius:10px;padding:12px 14px;font-size:14px}
-.msg.info{background:var(--accent-soft)}
-.msg.err{background:var(--bad-soft);color:#6e2618}
-.msg.ok{background:var(--ok-soft);color:#1f5a40}
+.msg{border-radius:10px;padding:12px 14px;font-size:14px;margin-top:10px}
+.msg.info{background:var(--accent-soft)}.msg.err{background:var(--bad-soft);color:#6e2618}.msg.ok{background:var(--ok-soft);color:#1f5a40}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .stat{border:1px solid var(--line);border-radius:10px;padding:10px 14px;background:#fff}
 .stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums}
 .stat span{color:var(--muted);font-size:13px}
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:#fff;margin-top:10px}
 table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
-th,td{padding:8px 10px;border-bottom:1px solid #e7e9e5;text-align:left;white-space:nowrap}
-th{background:#f3f4f1;font-weight:700;position:sticky;top:0}
+th,td{padding:7px 10px;border-bottom:1px solid #e7e9e5;text-align:left;white-space:nowrap}
+th{background:#f3f4f1;font-weight:700}
 td.num{text-align:right}
 tr.dup td{background:#fff7e2}
 .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700}
-.c0{background:#e3ecf3;color:#1f4a66}.c1{background:#fbecc9;color:#7a5200}.c2{background:#efe3f3;color:#5b2a6b}
+.early{background:#fbecc9;color:#7a5200}.late{background:#efe3f3;color:#5b2a6b}.control{background:#e3ecf3;color:#1f4a66}.none{background:#eee;color:#555}
 .flag{color:var(--bad);font-weight:700}
-.muted{color:var(--muted)}
+pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:#f3f4f1;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;max-height:260px;overflow:auto}
 [hidden]{display:none!important}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div>
-      <h1>드론 실험 결과 관리</h1>
-      <p class="sub">연구자 전용 페이지입니다. 참가자에게 이 주소를 보내지 마세요.</p>
-    </div>
-    <div class="row" id="who" hidden>
-      <span class="sub" id="who-email"></span>
-      <button class="btn" id="b-logout">로그아웃</button>
-    </div>
+    <div><h1>드론 실험 결과 관리 (v7 · 단서 v4)</h1><p class="sub">연구자 전용 페이지입니다. 참가자에게 이 주소를 보내지 마세요.</p></div>
+    <div class="row" id="who" hidden><span class="sub" id="who-email"></span><button class="btn" id="b-logout">로그아웃</button></div>
   </header>
 
   <section class="card" id="login-card">
-    <p style="margin-bottom:12px">실험 결과를 보려면 연구자 Google 계정으로 로그인하세요.</p>
+    <p style="margin-bottom:12px">연구자 Google 계정으로 로그인하세요.</p>
     <button class="btn primary" id="b-login">Google 계정으로 로그인</button>
-    <div class="msg err" id="login-err" style="margin-top:12px" hidden></div>
+    <div class="msg err" id="login-err" hidden></div>
   </section>
 
   <section class="card" id="uid-card" hidden>
     <p style="margin-bottom:8px">로그인한 계정의 UID</p>
     <div class="row"><span class="uid" id="uid"></span><button class="btn" id="b-copy-uid">복사</button></div>
-    <div class="msg info" id="rules-help" style="margin-top:12px" hidden>
-      아직 이 계정에 열람 권한이 없습니다. Firebase 콘솔 → Firestore → <b>규칙</b> 탭에서 <code>여기에_연구자_UID</code>를 위 UID로 바꾸고 <b>게시</b>를 누른 뒤, 이 페이지를 새로고침하세요.
-    </div>
+    <div class="msg info" id="rules-help" hidden>아직 이 계정에 권한이 없습니다. Firebase 콘솔 → Firestore → <b>규칙</b>에서 <code>여기에_연구자_UID</code>를 위 UID로 바꾸고 <b>게시</b>한 뒤 새로고침하세요.</div>
   </section>
 
-  <div id="data-area" hidden>
+  <div id="area" hidden>
+    <!-- 1. 자극 -->
     <section class="card">
-      <div class="stats" id="stats"></div>
+      <h2>1. 단서 자료 (동결 CSV)</h2>
+      <p class="sub" id="stim-state">확인 중…</p>
+      <div class="row" style="margin-top:10px">
+        <input type="file" id="f-csv" accept=".csv,text/csv">
+        <button class="btn primary" id="b-upload" disabled>검사 후 서버에 올리기</button>
+      </div>
+      <p class="sub" style="margin-top:8px"><code>drone-cue-final-v4-six-templates.csv</code>(120행)를 고르세요. 파일의 SHA-256이 동결값과 같고, 검사기와 같은 수치 검사를 모두 통과할 때만 올립니다. 참가자 화면에는 이 파일이 내려가지 않고, 보안 규칙이 회차·단계별로 필요한 값만 내려줍니다.</p>
+      <div class="msg" id="stim-msg" hidden></div>
+      <pre id="stim-log" hidden></pre>
     </section>
 
+    <!-- 2. 배정 -->
     <section class="card">
       <div class="row" style="justify-content:space-between">
-        <div class="row">
-          <label class="sub" for="f-cond">조건</label>
-          <select id="f-cond">
-            <option value="">전체</option>
-            <option value="0">0 · 고신뢰</option>
-            <option value="1">1 · 초기 오류</option>
-            <option value="2">2 · 후기 오류</option>
-          </select>
-          <label class="sub" for="f-ver">버전</label>
-          <select id="f-ver"><option value="">전체</option></select>
-          <input type="search" id="f-q" placeholder="뒷자리·전화번호 검색" aria-label="뒷자리 또는 전화번호 검색">
-          <button class="btn" id="b-reload">새로고침</button>
-        </div>
-        <div class="row">
-          <button class="btn primary" id="b-dl-sum">summary CSV 받기</button>
-          <button class="btn" id="b-dl-ev">events CSV 받기</button>
-          <button class="btn danger" id="b-del-vis">보이는 결과 모두 삭제</button>
-        </div>
+        <div><h2>2. 조건 × 템플릿 순차 배정 (18칸)</h2><p class="sub" id="seq-info">불러오는 중…</p></div>
+        <button class="btn danger" id="b-seq-reset">배정 순번 초기화</button>
       </div>
-      <p class="sub" style="margin-top:10px">CSV 받기와 모두 삭제는 지금 표에 보이는 행에만 적용됩니다(조건·버전·검색 적용). 노란 행은 같은 전화번호가 두 번 이상 있는 참여입니다. 중복 참여일 수 있으니 확인하세요.</p>
+      <p class="sub" style="margin-top:8px">순번 k → 칸 (k−1) % 18 → 조건(초기·후기·통제 반복) × 템플릿(B1N, B1M, B2N, B2M, B3N, B3M 순). 이해 확인을 마친 사람(2회 미통과 시 정답·해설 확인 후)만 순번을 받습니다. 시작 후 90분 안에 끝내지 못한 순번은 같은 칸으로 다음 참가자에게 먼저 다시 배정됩니다. <b>본 실험 링크를 보내기 직전에</b> 시험 자료를 지우고 순번을 초기화하세요.</p>
+      <div class="tbl-wrap"><table id="bal"></table></div>
     </section>
 
-    <div class="msg" id="data-msg" hidden></div>
-    <div class="tbl-wrap"><table>
-      <thead><tr>
-        <th>저장 시각</th><th>뒷자리</th><th>전화번호</th><th>조건</th>
-        <th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th><th>T8</th>
-        <th>자유시행 지도확인</th><th>주의점검</th><th>빠른응답</th><th>소요(초)</th><th>버전</th><th></th>
-      </tr></thead>
-      <tbody id="tbody"></tbody>
-    </table></div>
+    <!-- 3. 자료 -->
+    <section class="card">
+      <h2>3. 참여 기록</h2>
+      <div class="stats" id="stats"></div>
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <div class="row">
+          <label class="sub" for="f-cond">조건</label>
+          <select id="f-cond"><option value="">전체</option><option value="early">초기 오류</option><option value="late">후기 오류</option><option value="control">무오류 통제</option></select>
+          <label class="sub" for="f-ver">버전</label><select id="f-ver"><option value="">전체</option></select>
+          <input type="search" id="f-q" placeholder="뒷자리·전화번호 검색">
+          <label class="sub"><input type="checkbox" id="f-test"> 시험 자료(뒷자리 0000) 포함</label>
+          <button class="btn" id="b-reload">새로고침</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="b-dl-trials">회차 자료(trials_long) CSV</button>
+        <button class="btn" id="b-dl-sess">세션 목록 CSV</button>
+        <button class="btn" id="b-dl-sum">summary CSV</button>
+        <button class="btn" id="b-dl-ev">events CSV</button>
+        <button class="btn danger" id="b-del-vis">보이는 기록 모두 삭제</button>
+      </div>
+      <p class="sub" style="margin-top:8px"><b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
+      <div class="msg" id="data-msg" hidden></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>T0</th><th>위임률</th><th>평균 T</th><th>누적시간</th><th>사후 S-TIAS</th><th>주의점검</th><th>버전</th><th>상태</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </section>
   </div>
 </div>
 
 <script type="module">
-/* 실험앱(index.html)과 같은 Firebase 설정 */
 const firebaseConfig = {
   apiKey: "AIzaSyBUlL0re9lbLBi3LdyN2I6AqScUsQ2TbGQ",
   authDomain: "drone-experiment.firebaseapp.com",
@@ -129,169 +131,342 @@ const firebaseConfig = {
   messagingSenderId: "1000116659969",
   appId: "1:1000116659969:web:8faf57fdc7cac312181d00"
 };
-const COLLECTION = "participants";
-const CONDS = ["고신뢰", "초기 오류", "후기 오류"];
+const FROZEN_SHA = "cfb1a097ab0e52aecc11f5a19760fd37832b87032ec30f9a367581aaf66c95ea";
+const CONDS = ["early", "late", "control"], CNAME = { early: "초기 오류", late: "후기 오류", control: "무오류 통제", none: "이해확인 미통과" };
+const TEMPLATES = ["V4-B1N", "V4-B1M", "V4-B2N", "V4-B2M", "V4-B3N", "V4-B3M"];
+const SLOT_TIMEOUT_MIN = 90;   // index.html CONFIG.slotTimeoutMin과 같게
+const COLS = ("template trial item_id left_base left_delay_pct left_penalty right_base right_delay_pct right_penalty EV_left EV_right EV_gap F F_wrong left_delay right_delay left_actual right_actual Y actual_gap D_early D_late D_control").split(" ");
+const PUBLIC = ["template","trial","item_id","left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty"];
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const auth = getAuth(app), db = getFirestore(app);
 const $ = id => document.getElementById(id);
-let ROWS = [];
+const tid = n => "t" + String(n).padStart(2, "0");
+function esc(v){ return String(v ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
+function msg(id, kind, text){ const m = $(id); m.className = "msg " + kind; m.textContent = text; m.hidden = !text; }
+let PARTS = [], SESS = [], TRIALS = {}, STIM = null;
 
 $('b-login').onclick = async () => {
   $('login-err').hidden = true;
   try { await signInWithPopup(auth, new GoogleAuthProvider()); }
-  catch (e) {
-    const why = {
-      "auth/popup-blocked": "브라우저가 로그인 창을 막았습니다. 주소창의 팝업 차단 표시를 눌러 허용한 뒤 다시 시도하세요.",
-      "auth/unauthorized-domain": "이 주소가 Firebase의 승인된 도메인에 없습니다. Firebase 콘솔 → Authentication → 설정 → 승인된 도메인에 이 사이트 주소를 추가하세요.",
-      "auth/operation-not-allowed": "Google 로그인이 꺼져 있습니다. Firebase 콘솔 → Authentication → 로그인 방법에서 Google을 사용 설정하세요.",
-      "auth/popup-closed-by-user": "로그인 창이 닫혔습니다. 다시 시도하세요."
-    }[e.code] || `로그인하지 못했습니다 (${e.code || e.message}).`;
-    $('login-err').textContent = why; $('login-err').hidden = false;
-  }
+  catch (e) { const why = { "auth/popup-blocked": "브라우저가 로그인 창을 막았습니다. 팝업을 허용한 뒤 다시 시도하세요.",
+      "auth/unauthorized-domain": "이 주소가 Firebase 승인된 도메인에 없습니다. Authentication → 설정 → 승인된 도메인에 추가하세요.",
+      "auth/operation-not-allowed": "Google 로그인이 꺼져 있습니다. Authentication → 로그인 방법에서 Google을 사용 설정하세요." }[e.code] || `로그인하지 못했습니다 (${e.code || e.message}).`;
+    $('login-err').textContent = why; $('login-err').hidden = false; }
 };
 $('b-logout').onclick = () => signOut(auth);
-$('b-copy-uid').onclick = async () => {
-  try { await navigator.clipboard.writeText($('uid').textContent); $('b-copy-uid').textContent = "복사됨"; }
-  catch (e) { const r = document.createRange(); r.selectNodeContents($('uid')); getSelection().removeAllRanges(); getSelection().addRange(r); }
-};
-
+$('b-copy-uid').onclick = async () => { try { await navigator.clipboard.writeText($('uid').textContent); $('b-copy-uid').textContent = "복사됨"; } catch (e) {} };
 onAuthStateChanged(auth, user => {
-  const inn = !!user;
-  $('login-card').hidden = inn; $('who').hidden = !inn; $('uid-card').hidden = !inn;
-  $('data-area').hidden = true; $('rules-help').hidden = true;
+  const inn = !!user && !user.isAnonymous;
+  $('login-card').hidden = inn; $('who').hidden = !inn; $('uid-card').hidden = !inn; $('area').hidden = true; $('rules-help').hidden = true;
   if (!inn) return;
-  $('who-email').textContent = user.email || "";
-  $('uid').textContent = user.uid;
-  loadData();
+  $('who-email').textContent = user.email || ""; $('uid').textContent = user.uid;
+  loadAll();
 });
 
-function setMsg(kind, text){ const m = $('data-msg'); m.className = "msg " + kind; m.textContent = text; m.hidden = !text; m.style.marginBottom = "14px"; }
+/* ====================== 1. 동결 CSV 검사·업로드 ====================== */
+async function sha256Hex(buf){ const h = await crypto.subtle.digest("SHA-256", buf); return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, "0")).join(""); }
+// 검사기(drone-cue-v4-preapp-validator.py)의 check_rows와 같은 조건을 정수 연산으로 다시 확인
+function validate(text){
+  const E = [2,4,7,9], L = [12,14,17,19], W = { 1: [2,6,9,12,15,19], 2: [2,5,9,12,16,19], 3: [2,8,9,12,13,19] };
+  const fail = m => { throw new Error(m); };
+  const lines = text.replace(/^﻿/, "").split(/\r\n|\n/).filter(l => l !== "");
+  if (lines[0] !== COLS.join(",")) fail("열 이름·순서가 다릅니다");
+  const rows = lines.slice(1).map(l => { const v = l.split(","); if (v.length !== COLS.length) fail("열 개수 오류"); return Object.fromEntries(COLS.map((c, i) => [c, v[i]])); });
+  if (rows.length !== 120) fail("120행이 아닙니다");
+  const ev100 = s => { if (!/^-?\d+(\.\d+)?$/.test(s)) fail("EV 형식 오류"); return Math.round(Number(s) * 100); };
+  const lower = (a, b) => a < b ? [0] : b < a ? [1] : [0, 1];
+  const R = rows.map(src => {
+    const r = { template: src.template, item_id: src.item_id };
+    for (const k of COLS) if (!["template","item_id","EV_left","EV_right","EV_gap"].includes(k)) { if (!/^-?\d+$/.test(src[k])) fail("정수 아님: " + k); r[k] = Number(src[k]); }
+    r.EV_left100 = ev100(src.EV_left); r.EV_right100 = ev100(src.EV_right); r.EV_gap100 = ev100(src.EV_gap);
+    const m = /^V4-B([123])([NM])$/.exec(r.template); if (!m) fail("템플릿 이름 오류");
+    if (r.trial < 1 || r.trial > 20) fail("회차 범위 오류");
+    if (r.item_id !== `V4-B${m[1]}-T${String(r.trial).padStart(2, "0")}`) fail("item_id 불일치 " + r.item_id);
+    for (const k of ["F","F_wrong","Y","D_early","D_late","D_control","left_delay","right_delay"]) if (r[k] !== 0 && r[k] !== 1) fail("0/1 아님 " + k);
+    const [a, p, d, b, q, e] = ["left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty"].map(k => r[k]);
+    if (![p, q].every(v => v >= 20 && v <= 80 && v % 5 === 0)) fail("확률 범위");
+    if (![a, b].every(v => v >= 15 && v % 5 === 0)) fail("기본시간 범위");
+    if (![d, e].every(v => v >= 10 && v <= 40 && v % 5 === 0)) fail("추가시간 범위");
+    if (Math.max(a + d, b + e) > 100) fail("지연 후 100초 초과");
+    if (a === b || p === q) fail("기본시간·확률 동률");
+    const evL = 100 * a + p * d, evR = 100 * b + q * e;
+    if (r.EV_left100 !== evL || r.EV_right100 !== evR) fail("EV 불일치 " + r.item_id);
+    if (Math.abs(evL - evR) !== 500 || r.EV_gap100 !== 500) fail("EV 차이 5초 아님 " + r.item_id);
+    const f = evR < evL ? 1 : 0; if (r.F !== f) fail("F 불일치 " + r.item_id);
+    let win = 0;
+    for (const dl of [0, 1]) for (const dr of [0, 1]) { const tl = a + dl * d, tr = b + dr * e; if (tl === tr) fail("가능한 결과 동률 " + r.item_id);
+      if ((tr < tl ? 1 : 0) === f) win += (dl ? p : 100 - p) * (dr ? q : 100 - q); }
+    if (win !== 7000) fail("기준모형 승률 70% 아님 " + r.item_id);
+    if (a + r.left_delay * d !== r.left_actual || b + r.right_delay * e !== r.right_actual) fail("실제 시간 불일치 " + r.item_id);
+    const y = r.right_actual < r.left_actual ? 1 : 0; if (r.Y !== y) fail("Y 불일치 " + r.item_id);
+    if (r.F_wrong !== (f !== y ? 1 : 0)) fail("F_wrong 불일치");
+    if (r.actual_gap !== Math.abs(r.left_actual - r.right_actual)) fail("actual_gap 불일치");
+    for (const [nm, pos] of [["early", E], ["late", L], ["control", []]]) if (r["D_" + nm] !== (y ^ (pos.includes(r.trial) ? 1 : 0))) fail("D 일정 불일치 " + nm + " " + r.item_id);
+    return r;
+  });
+  const tpls = [...new Set(R.map(r => r.template))].sort();
+  if (JSON.stringify(tpls) !== JSON.stringify(["V4-B1M","V4-B1N","V4-B2M","V4-B2N","V4-B3M","V4-B3N"])) fail("템플릿 구성 불일치");
+  for (const t of tpls) {
+    const rs = R.filter(r => r.template === t);
+    if (rs.map(r => r.trial).join() !== Array.from({ length: 20 }, (_, i) => i + 1).join()) fail("회차 누락·중복·순서 " + t);
+    const bank = Number(t[4]);
+    if (rs.filter(r => r.F_wrong).map(r => r.trial).join() !== W[bank].join()) fail("F 실패 위치 " + t);
+    for (const k of ["F","Y","D_early","D_late","D_control"]) if (rs.filter(r => r[k] === 1).length !== 10) fail("좌우 균형 " + k + " " + t);
+    if (rs.reduce((s, r) => s + r.actual_gap * r.F_wrong, 0) !== 60) fail("F 손실 60초 아님 " + t);
+    if (rs.reduce((s, r) => s + Math.min(r.left_actual, r.right_actual), 0) !== 940) fail("최단 합계 940초 아님 " + t);
+    let base2 = 0, prob2 = 0;
+    for (const r of rs) { const lb = lower(r.left_base, r.right_base), lp = lower(r.left_delay_pct, r.right_delay_pct);
+      base2 += lb.includes(r.Y) ? 2 / lb.length : 0; prob2 += lp.includes(r.Y) ? 2 / lp.length : 0; }
+    if (base2 !== 20 || prob2 !== 24) fail("주요 휴리스틱 점수 불일치 " + t);
+    for (const [nm, es] of [["early", E], ["late", L]]) {
+      const cell = { TT: 0, TF: 0, FT: 0, FF: 0 };
+      rs.forEach(r => cell[(r.F === r.Y ? "T" : "F") + (r["D_" + nm] === r.Y ? "T" : "F")]++);
+      if (cell.TT !== 12 || cell.TF !== 2 || cell.FT !== 4 || cell.FF !== 2) fail("공동 정오 불일치 " + nm + " " + t);
+      if (!rs.filter(r => es.includes(r.trial)).every(r => r.actual_gap === 10)) fail("오류 손실 10초 아님 " + t);
+    }
+    const norm = new Set(rs.map(r => { const z = Math.min(r.left_base, r.right_base);
+      return [[r.left_base - z, r.left_delay_pct, r.left_penalty], [r.right_base - z, r.right_delay_pct, r.right_penalty]].map(x => x.join(":")).sort().join("|"); }));
+    if (norm.size !== 20) fail("정규화 구조 반복 " + t);
+  }
+  for (const bank of [1, 2, 3]) for (let tr = 1; tr <= 20; tr++) {
+    const n = R.find(r => r.template === `V4-B${bank}N` && r.trial === tr), m = R.find(r => r.template === `V4-B${bank}M` && r.trial === tr);
+    for (const [a, b] of [["left_base","right_base"],["left_delay_pct","right_delay_pct"],["left_penalty","right_penalty"],["left_delay","right_delay"],["left_actual","right_actual"],["EV_left100","EV_right100"]])
+      if (n[a] !== m[b] || n[b] !== m[a]) fail("좌우 반전 불일치 B" + bank + " " + tr);
+    for (const k of ["F","Y","D_early","D_late","D_control"]) if (n[k] !== 1 - m[k]) fail("반전 방향 불일치");
+  }
+  return R;
+}
+let PENDING = null;
+$('f-csv').onchange = async e => {
+  const file = e.target.files[0]; PENDING = null; $('b-upload').disabled = true; $('stim-log').hidden = true;
+  if (!file) return;
+  const buf = await file.arrayBuffer(), sha = await sha256Hex(buf);
+  if (sha !== FROZEN_SHA) return msg('stim-msg', "err", `SHA-256이 동결값과 다릅니다. 올리지 않습니다.\n파일: ${sha}\n동결: ${FROZEN_SHA}`);
+  try { const rows = validate(new TextDecoder("utf-8").decode(buf)); PENDING = { rows, sha, name: file.name };
+    msg('stim-msg', "ok", `해시 일치, 수치 검사 통과 (120행 · 6템플릿). '검사 후 서버에 올리기'를 누르세요.`); $('b-upload').disabled = false; }
+  catch (err) { msg('stim-msg', "err", "검사 실패: " + err.message); }
+};
+$('b-upload').onclick = async () => {
+  if (!PENDING) return;
+  const btn = $('b-upload'); btn.disabled = true; btn.textContent = "올리는 중…";
+  const out = [];
+  try {
+    const R = PENDING.rows;
+    let b = writeBatch(db), n = 0;
+    const flush = async () => { if (n) { await b.commit(); out.push(`${n}건 저장`); } b = writeBatch(db); n = 0; };
+    const put = async (ref, data) => { b.set(ref, data); n++; if (n >= 450) await flush(); };
+    for (const r of R) {
+      const t = tid(r.trial);
+      await put(doc(db, "cues", r.template, "t", t), Object.fromEntries(PUBLIC.map(k => [k, r[k]])));
+      for (const c of CONDS) await put(doc(db, "outcomes", r.template, "c", c, "t", t),
+        { left_delay: r.left_delay, right_delay: r.right_delay, left_actual: r.left_actual, right_actual: r.right_actual, Y: r.Y, D: r["D_" + c] });
+      await put(doc(db, "research", r.template, "t", t), { item_id: r.item_id, EV_left: r.EV_left100 / 100, EV_right: r.EV_right100 / 100, EV_gap: r.EV_gap100 / 100,
+        F: r.F, F_wrong: r.F_wrong, actual_gap: r.actual_gap, D_early: r.D_early, D_late: r.D_late, D_control: r.D_control });
+    }
+    await flush();
+    // 모든 자료가 저장된 뒤에만 확인값을 기록 (참가자 앱은 이 값이 맞아야 시작)
+    b.set(doc(db, "meta", "stimulus"), { sha256: PENDING.sha, rows: 120, file_name: PENDING.name, uploaded_at: serverTimestamp(), uploaded_by: auth.currentUser.uid }); n++;
+    await flush();
+    msg('stim-msg', "ok", "업로드 완료: 공개 단서 120, 조건별 결과 360, 연구자용 값 120, 확인값 1. 다시 읽어 대조합니다…");
+    const bad = await verifyServer(R);
+    msg('stim-msg', bad ? "err" : "ok", bad ? `서버 대조 불일치 ${bad}건. 다시 올려 보세요.` : "업로드 및 서버 대조 완료 (601개 문서 모두 일치).");
+    loadStim();
+  } catch (e) { msg('stim-msg', "err", `올리지 못했습니다 (${e.code || e.message}). 보안 규칙의 연구자 UID를 확인하세요.`); }
+  finally { $('stim-log').hidden = false; $('stim-log').textContent = out.join("\n"); btn.textContent = "검사 후 서버에 올리기"; btn.disabled = false; }
+};
+async function loadStimFromServer(){
+  const S = { cues: {}, out: {}, res: {} };
+  await Promise.all(TEMPLATES.map(async t => {
+    (await getDocs(collection(db, "cues", t, "t"))).forEach(d => S.cues[t + "/" + d.id] = d.data());
+    (await getDocs(collection(db, "research", t, "t"))).forEach(d => S.res[t + "/" + d.id] = d.data());
+    for (const c of CONDS) (await getDocs(collection(db, "outcomes", t, "c", c, "t"))).forEach(d => S.out[t + "/" + c + "/" + d.id] = d.data());
+  }));
+  return S;
+}
+async function verifyServer(R){
+  const S = await loadStimFromServer(); let bad = 0;
+  for (const r of R) { const t = tid(r.trial), cu = S.cues[r.template + "/" + t];
+    if (!cu || PUBLIC.some(k => cu[k] !== r[k]) || Object.keys(cu).length !== PUBLIC.length) bad++;
+    for (const c of CONDS) { const o = S.out[r.template + "/" + c + "/" + t];
+      if (!o || o.D !== r["D_" + c] || o.Y !== r.Y || o.left_actual !== r.left_actual || o.right_actual !== r.right_actual) bad++; } }
+  STIM = S; return bad;
+}
+async function loadStim(){
+  try { const s = await getDoc(doc(db, "meta", "stimulus"));
+    if (!s.exists()) { $('stim-state').innerHTML = `<span class="flag">아직 올리지 않았습니다.</span> 참가자 앱은 자료가 올라오기 전에는 시작되지 않습니다.`; return; }
+    const d = s.data();
+    $('stim-state').innerHTML = d.sha256 === FROZEN_SHA ? `서버 자료: 동결 해시와 일치 (${esc(d.file_name || "")}, ${esc(d.uploaded_at && d.uploaded_at.toDate ? d.uploaded_at.toDate().toLocaleString("ko-KR") : "")})`
+      : `<span class="flag">서버 확인값이 동결 해시와 다릅니다.</span> 다시 올리세요.`;
+  } catch (e) { $('stim-state').textContent = `확인하지 못했습니다 (${e.code || e.message}).`; }
+}
 
-async function loadData(){
+/* ====================== 2·3. 배정·기록 ====================== */
+async function loadAll(){
   $('b-reload').disabled = true;
   try {
-    const snap = await getDocs(query(collection(db, COLLECTION), orderBy("created_at", "desc")));
-    ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    $('data-area').hidden = false; $('rules-help').hidden = true;
-    setMsg(ROWS.length ? "" : "info", ROWS.length ? "" : "아직 저장된 결과가 없습니다. 실험앱에서 참가자가 끝까지 마치면 여기에 나타납니다.");
-    render();
+    const [ps, ss] = await Promise.all([getDocs(query(collection(db, "participants"), orderBy("created_at", "desc"))), getDocs(collection(db, "sessions"))]);
+    PARTS = ps.docs.map(d => ({ id: d.id, ...d.data() }));
+    SESS = ss.docs.map(d => ({ uid: d.id, ...d.data() }));
+    $('area').hidden = false; $('rules-help').hidden = true;
+    await Promise.all(SESS.map(async s => { const q = await getDocs(collection(db, "sessions", s.uid, "trials")); TRIALS[s.uid] = {}; q.forEach(d => TRIALS[s.uid][d.id] = d.data()); }));
+    loadStim(); await loadSeq(); render();
   } catch (e) {
-    if (e.code === "permission-denied") { $('rules-help').hidden = false; $('data-area').hidden = true; }
-    else { $('data-area').hidden = false; setMsg("err", `결과를 불러오지 못했습니다 (${e.code || e.message}). 인터넷 연결을 확인하고 새로고침하세요.`); }
+    if (e.code === "permission-denied") { $('rules-help').hidden = false; }
+    else { $('area').hidden = false; msg('data-msg', "err", `불러오지 못했습니다 (${e.code || e.message}).`); }
   } finally { $('b-reload').disabled = false; }
 }
-
-function visible(){
-  const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, "");
-  return ROWS.filter(r => (c === "" || String(r.condition) === c) && (v === "" || String(r.app_version) === v) && (!q || String(r.pid).includes(q) || String(r.phone || "").replace(/\D/g, "").includes(q)));
+let ASSIGN = {};
+async function loadSeq(){
+  try {
+    const snap = await getDoc(doc(db, "meta", "assign")); ASSIGN = snap.exists() ? snap.data() : {};
+    const last = Number(ASSIGN.n) || 0, slots = ASSIGN.slots || {}, now = Date.now(), limit = SLOT_TIMEOUT_MIN * 60000;
+    const ks = Object.keys(slots).map(Number).filter(k => k >= 1).sort((a, b) => a - b);
+    const done = ks.filter(k => slots[k].d), running = ks.filter(k => !slots[k].d && now - Number(slots[k].t) <= limit), free = ks.filter(k => !slots[k].d && now - Number(slots[k].t) > limit);
+    const next = free.length ? free[0] : last + 1, cell = (next - 1) % 18;
+    $('seq-info').innerHTML = `만든 순번 ${last}개 · 완료 <b>${done.length}</b> · 진행 중 ${running.length} · 비어서 다시 배정될 순번 ${free.length}${free.length ? " (" + free.join(", ") + ")" : ""}<br>` +
+      `다음 참가자: <b>순번 ${next} → ${CNAME[CONDS[cell % 3]]} · ${TEMPLATES[Math.floor(cell / 3)]}</b>${free.length ? " (중도 이탈 자리 우선)" : ""}`;
+  } catch (e) { $('seq-info').textContent = `순번을 불러오지 못했습니다 (${e.code || e.message}).`; }
 }
-function fmtTime(ts){ try { return ts && ts.toDate ? ts.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "medium" }) : ""; } catch (e) { return ""; } }
-function esc(v){ return String(v ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
+$('b-seq-reset').onclick = async () => {
+  if (!confirm("배정 순번을 0으로 되돌립니다. 다음 참가자부터 순번 1(초기 오류 · V4-B1N)이 다시 시작됩니다. 본 실험 중에는 누르지 마세요. 계속할까요?")) return;
+  try { await deleteDoc(doc(db, "meta", "assign")); await loadSeq(); msg('data-msg', "ok", "배정 순번을 초기화했습니다."); }
+  catch (e) { msg('data-msg', "err", `초기화하지 못했습니다 (${e.code || e.message}).`); }
+};
 
-function fillVersions(){
-  const sel = $('f-ver'), cur = sel.value;
-  const vers = [...new Set(ROWS.map(r => String(r.app_version || "")))].filter(Boolean).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-  sel.innerHTML = `<option value="">전체</option>` + vers.map(v => `<option value="${esc(v)}">${esc(v)} (${ROWS.filter(r => String(r.app_version) === v).length}건)</option>`).join("");
-  sel.value = vers.includes(cur) ? cur : "";
+const isTest = pid => String(pid) === "0000";
+function sessStatus(s){
+  const tr = TRIALS[s.uid] || {}, n = Object.values(tr).filter(x => "T" in x).length;
+  const age = s.created_at && s.created_at.toDate ? Date.now() - s.created_at.toDate().getTime() : 0;
+  return { n, status: s.finished ? "완료" : (age > SLOT_TIMEOUT_MIN * 60000 ? "중도 이탈" : "진행 중") };
+}
+function partOf(s){ return PARTS.find(p => p.uid === s.uid); }
+function visibleSess(){
+  const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, ""), withTest = $('f-test').checked;
+  return SESS.filter(s => (withTest || !isTest(s.pid)) && (c === "" || s.condition === c) && (v === "" || s.app_version === v) &&
+    (!q || String(s.pid).includes(q) || String((partOf(s) || {}).phone || "").replace(/\D/g, "").includes(q)))
+    .sort((a, b) => (Number(b.slot) || 0) - (Number(a.slot) || 0));
+}
+function visibleParts(){
+  const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, ""), withTest = $('f-test').checked;
+  return PARTS.filter(p => (withTest || !isTest(p.pid)) && (c === "" || p.condition === c) && (v === "" || p.app_version === v) &&
+    (!q || String(p.pid).includes(q) || String(p.phone || "").replace(/\D/g, "").includes(q)));
 }
 function render(){
-  fillVersions();
-  const phones = {}; ROWS.forEach(r => { const p = r.phone || ""; if (p) phones[p] = (phones[p] || 0) + 1; });
-  const n = [0, 1, 2].map(c => ROWS.filter(r => r.condition === c).length);
-  const dupN = Object.values(phones).filter(x => x > 1).length;
-  $('stats').innerHTML =
-    `<div class="stat"><b>${ROWS.length}</b><span>전체 참여</span></div>` +
-    n.map((k, i) => `<div class="stat"><b>${k}</b><span>조건 ${i} · ${CONDS[i]}</span></div>`).join("") +
-    `<div class="stat"><b>${dupN}</b><span>중복 의심 전화번호</span></div>`;
-  const rows = visible();
-  $('tbody').innerHTML = rows.map(r => {
-    const s = r.summary || {};
-    const dup = r.phone && phones[r.phone] > 1;
-    const attn = s.attn_pass === 1 || s.attn_pass === "1" ? "통과" : `<span class="flag">실패</span>`;
-    return `<tr class="${dup ? "dup" : ""}">
-      <td>${esc(fmtTime(r.created_at))}</td><td>${esc(r.pid)}</td><td>${esc(r.phone)}</td>
-      <td><span class="pill c${esc(r.condition)}">${esc(r.condition)} · ${esc(CONDS[r.condition] || "")}</span></td>
-      ${["T1","T2","T3","T4","T5","T6","T7","T8"].map(k => `<td class="num">${esc(s[k])}</td>`).join("")}
-      <td class="num">${esc(s.free_check_rate)}</td><td>${attn}</td><td class="num">${esc(s.fast_rt_rate)}</td>
-      <td class="num">${esc(s.total_time_s)}</td><td>${esc(r.app_version)}</td>
-      <td><div class="row" style="flex-wrap:nowrap;gap:6px">
-        <button class="btn" data-ev="${esc(r.id)}" style="min-height:32px;padding:0 10px">events</button>
-        <button class="btn danger" data-del="${esc(r.id)}" style="min-height:32px;padding:0 10px">삭제</button></div></td>
-    </tr>`;
-  }).join("") || `<tr><td colspan="18" class="muted" style="padding:18px">조건에 맞는 결과가 없습니다.</td></tr>`;
+  const sel = $('f-ver'), cur = sel.value;
+  const vers = [...new Set([...SESS, ...PARTS].map(r => String(r.app_version || "")))].filter(Boolean).sort().reverse();
+  sel.innerHTML = `<option value="">전체</option>` + vers.map(v => `<option>${esc(v)}</option>`).join(""); sel.value = vers.includes(cur) ? cur : "";
+  const real = SESS.filter(s => !isTest(s.pid));
+  const st = real.map(s => ({ s, ...sessStatus(s) }));
+  // 균형표: 조건 × 템플릿 (완료 / 진행 중 / 중도 이탈)
+  $('bal').innerHTML = `<tr><th>조건 \\ 템플릿</th>${TEMPLATES.map(t => `<th>${t}</th>`).join("")}<th>합계 완료</th></tr>` +
+    CONDS.map(c => `<tr><td><span class="pill ${c}">${CNAME[c]}</span></td>` + TEMPLATES.map(t => {
+      const xs = st.filter(x => x.s.condition === c && x.s.template === t);
+      const f = xs.filter(x => x.status === "완료").length, r = xs.filter(x => x.status === "진행 중").length, d = xs.filter(x => x.status === "중도 이탈").length;
+      return `<td class="num">${f}${r ? ` <span class="sub">+진행 ${r}</span>` : ""}${d ? ` <span class="flag">이탈 ${d}</span>` : ""}</td>`; }).join("") +
+      `<td class="num"><b>${st.filter(x => x.s.condition === c && x.status === "완료").length}</b></td></tr>`).join("") +
+    `<tr><td colspan="8" class="sub">이해 확인 2회 미통과 → 정답·해설 확인 후 진행(comp_passed=0): ` +
+      CONDS.map(c => `${CNAME[c]} ${real.filter(s => s.condition === c && Number(s.comp_passed) === 0).length}명`).join(" · ") + `</td></tr>`;
+  const phones = {}; PARTS.forEach(p => { if (p.phone && !isTest(p.pid)) phones[p.phone] = (phones[p.phone] || 0) + 1; });
+  $('stats').innerHTML = [
+    [real.length, "배정된 세션(시험 제외)"], [st.filter(x => x.status === "완료").length, "완료"], [st.filter(x => x.status === "진행 중").length, "진행 중"],
+    [st.filter(x => x.status === "중도 이탈").length, "중도 이탈"], [Object.values(phones).filter(x => x > 1).length, "중복 의심 전화번호"]
+  ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+  $('tbody').innerHTML = visibleSess().map(s => {
+    const p = partOf(s) || {}, sm = p.summary || {}, { n, status } = sessStatus(s), tr = Object.values(TRIALS[s.uid] || {}).filter(x => "T" in x);
+    const aRate = tr.length ? (tr.reduce((a, x) => a + x.A, 0) / tr.length).toFixed(2) : "", tMean = tr.length ? (tr.reduce((a, x) => a + x.T, 0) / tr.length).toFixed(1) : "";
+    const cum = tr.length ? Math.max(...tr.map(x => x.cum)) : "";
+    return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
+      <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${esc(s.slot)}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
+      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td class="num">${esc(s.T0 ?? "")}</td><td class="num">${aRate}</td><td class="num">${tMean}</td><td class="num">${cum}</td>
+      <td class="num">${esc(sm.stias_mean ?? "")}</td><td>${sm.attn_pass === "" || sm.attn_pass === undefined ? "" : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
+      <td>${esc(s.app_version)}</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td></tr>`;
+  }).join("") || `<tr><td colspan="15" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
 }
 
-/* CSV */
+/* ====================== CSV 내보내기 ====================== */
 function csvCell(v){
   if (v === undefined || v === null) return "";
   let s = String(v);
-  // 스프레드시트 수식 주입 방지(OWASP): 숫자가 아닌 글자가 = + - @ 탭·줄바꿈으로 시작하면 앞에 ' 를 붙여 글자로 취급
-  if (typeof v === "string" && /^[=+\-@\t\r\n\uFF1D\uFF0B\uFF0D\uFF20]/.test(s) && !(s.trim() !== "" && Number.isFinite(Number(s)))) s = "'" + s;
+  if (typeof v === "string" && /^[=+\-@\t\r\n＝＋－＠]/.test(s) && !(s.trim() !== "" && Number.isFinite(Number(s)))) s = "'" + s;
   return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-function save(name, text){
-  const url = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+function save(name, cols, rows){
+  const text = "﻿" + [cols.join(","), ...rows.map(r => cols.map(c => csvCell(r[c])).join(","))].join("\r\n");
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 function stampNow(){ const d = new Date(), p = x => String(x).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
-function summaryCSV(rows){
+const TL_COLS = ["uid","pid","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0","trial","item_id",
+  "left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty",
+  "H","rt_H","rt_H_first","A","rt_A","rt_A_first","D","D_schedule_error","left_delay","right_delay","left_actual","right_actual","Y",
+  "C","time_C","cum","T","rt_T","T_prev","F","F_wrong","EV_left","EV_right","H_correct","D_correct","C_correct","H_eq_F","H_eq_D",
+  "R_model_H","R_real_C","integrity","resumed","net_cue_ms","net_out_ms","ts_cue","ts_H","ts_A","ts_result","ts_T"];
+$('b-dl-trials').onclick = async () => {
+  const btn = $('b-dl-trials'); btn.disabled = true; btn.textContent = "만드는 중…";
+  try {
+    if (!STIM) STIM = await loadStimFromServer();
+    const rows = [];
+    for (const s of visibleSess()) {
+      const { n, status } = sessStatus(s), tr = TRIALS[s.uid] || {};
+      for (let k = 1; k <= 20; k++) {
+        const t = tid(k), x = tr[t]; if (!x) continue;
+        const cu = STIM.cues[s.template + "/" + t] || {}, o = STIM.out[s.template + "/" + s.condition + "/" + t] || {}, rs = STIM.res[s.template + "/" + t] || {};
+        const has = "T" in x, minEV = Math.min(rs.EV_left, rs.EV_right), fast = Math.min(o.left_actual, o.right_actual);
+        const expC = x.A === undefined ? undefined : (x.A === 0 ? x.H : o.D), expTime = expC === 0 ? o.left_actual : o.right_actual;
+        const integrity = !has ? "incomplete" : (x.D === o.D && x.C === expC && x.time_C === expTime ? "ok" : "MISMATCH");
+        const prevT = k === 1 ? s.T0 : (tr[tid(k - 1)] || {}).T;
+        rows.push(Object.assign({ uid: s.uid, pid: s.pid, slot: s.slot, cell: s.cell, condition: s.condition, template: s.template, app_version: s.app_version, view: s.view ?? "",
+          comp_passed: s.comp_passed ?? "", session_status: status, trials_done: n, T0: s.T0 }, cu, x, {
+          D: has ? x.D : "", D_schedule_error: o.D === undefined ? "" : Number(o.D !== o.Y),
+          left_delay: has ? o.left_delay : "", right_delay: has ? o.right_delay : "", left_actual: has ? o.left_actual : "", right_actual: has ? o.right_actual : "", Y: has ? o.Y : "",
+          T_prev: prevT ?? "", F: rs.F, F_wrong: rs.F_wrong, EV_left: rs.EV_left, EV_right: rs.EV_right,
+          H_correct: has ? Number(x.H === o.Y) : "", D_correct: has ? Number(x.D === o.Y) : "", C_correct: has ? Number(x.C === o.Y) : "",
+          H_eq_F: Number(x.H === rs.F), H_eq_D: has ? Number(x.H === x.D) : "",
+          R_model_H: rs.EV_left === undefined ? "" : Math.round(((x.H === 0 ? rs.EV_left : rs.EV_right) - minEV) * 100) / 100,
+          R_real_C: has ? x.time_C - fast : "", integrity }));
+      }
+    }
+    save(`trials_long_${stampNow()}.csv`, TL_COLS, rows);
+    const mm = rows.filter(r => r.integrity === "MISMATCH").length;
+    msg('data-msg', mm ? "err" : "ok", `회차 ${rows.length}행을 받았습니다.${mm ? ` 검증 불일치 ${mm}행이 있습니다(integrity=MISMATCH).` : ""}`);
+  } catch (e) { msg('data-msg', "err", `만들지 못했습니다 (${e.code || e.message}).`); }
+  finally { btn.disabled = false; btn.textContent = "회차 자료(trials_long) CSV"; }
+};
+$('b-dl-sess').onclick = () => {
+  const cols = ["uid","pid","phone","slot","cell","condition","template","app_version","device","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
+  save(`sessions_${stampNow()}.csv`, cols, visibleSess().map(s => { const { n, status } = sessStatus(s);
+    return { ...s, phone: (partOf(s) || {}).phone || "", created_at: s.created_at && s.created_at.toDate ? s.created_at.toDate().toISOString() : "", trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
+};
+$('b-dl-sum').onclick = () => {
+  const rows = visibleParts(); if (!rows.length) return;
   const cols = []; rows.forEach(r => (r.summary_cols || Object.keys(r.summary || {})).forEach(c => { if (!cols.includes(c)) cols.push(c); }));
-  const head = ["doc_id", "saved_at", ...cols];
-  return [head.join(","), ...rows.map(r => [r.id, fmtTime(r.created_at), ...cols.map(c => (r.summary || {})[c])].map(csvCell).join(","))].join("\r\n");
-}
-function eventsCSV(rows){
-  let header = null; const out = []; let skipped = 0;
-  rows.forEach(r => {
-    const lines = String(r.events_csv || "").replace(/^﻿/, "").split("\r\n").filter(l => l !== "");
-    if (!lines.length) return;
-    if (header === null) { header = lines[0]; out.push(header); }
-    if (lines[0] !== header) { skipped++; return; }
-    out.push(...lines.slice(1));
-  });
-  return { text: out.join("\r\n"), skipped };
-}
-$('b-dl-sum').onclick = () => { const rows = visible(); if (rows.length) save(`summary_all_${stampNow()}.csv`, summaryCSV(rows)); };
+  save(`summary_all_${stampNow()}.csv`, ["doc_id", ...cols], rows.map(r => ({ doc_id: r.id, ...(r.summary || {}) })));
+};
 $('b-dl-ev').onclick = () => {
-  const rows = visible(); if (!rows.length) return;
-  const { text, skipped } = eventsCSV(rows); save(`events_all_${stampNow()}.csv`, text);
-  if (skipped) setMsg("info", `열 구성이 다른 버전의 결과 ${skipped}건은 합치지 않았습니다. 해당 행의 events 버튼으로 따로 받으세요.`);
+  const rows = visibleParts(); if (!rows.length) return;
+  let header = null; const out = [];
+  rows.forEach(r => { const lines = String(r.events_csv || "").replace(/^﻿/, "").split("\r\n").filter(Boolean); if (!lines.length) return;
+    if (header === null) { header = lines[0]; out.push(header); } if (lines[0] === header) out.push(...lines.slice(1)); });
+  const url = URL.createObjectURL(new Blob(["﻿" + out.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement('a'); a.href = url; a.download = `events_all_${stampNow()}.csv`; document.body.appendChild(a); a.click(); a.remove();
 };
-$('tbody').addEventListener('click', async e => {
-  const ev = e.target.closest('[data-ev]'), del = e.target.closest('[data-del]');
-  if (ev) { const r = ROWS.find(x => x.id === ev.dataset.ev); if (r) save(`${r.id}_events.csv`, String(r.events_csv || "").replace(/^﻿/, "")); }
-  if (del) {
-    const r = ROWS.find(x => x.id === del.dataset.del); if (!r) return;
-    if (!confirm(`${r.pid} (${r.phone || "번호 없음"}) 결과를 영구 삭제할까요? 되돌릴 수 없습니다. 테스트 자료를 지울 때만 쓰세요.`)) return;
-    try { await deleteDoc(doc(db, COLLECTION, r.id)); ROWS = ROWS.filter(x => x.id !== r.id); render(); setMsg("ok", `${r.pid} 결과를 삭제했습니다.`); }
-    catch (err) { setMsg("err", `삭제하지 못했습니다 (${err.code || err.message}).`); }
-  }
-});
 $('b-del-vis').onclick = async () => {
-  const rows = visible(); if (!rows.length) return setMsg("info", "지울 결과가 없습니다.");
-  const v = $('f-ver').value, c = $('f-cond').value;
-  const scope = `${v ? "버전 " + v : "모든 버전"}, ${c === "" ? "모든 조건" : "조건 " + c}${$('f-q').value ? ", 검색어 적용" : ""}`;
-  if (!v && !c && !$('f-q').value && !confirm(`필터 없이 전체 ${rows.length}건이 선택되어 있습니다. 정말 전부 지우려는 것이 맞나요?`)) return;
-  const typed = prompt(`${scope} 결과 ${rows.length}건을 영구 삭제합니다. 되돌릴 수 없습니다.\n먼저 CSV를 받아 두었는지 확인하세요.\n\n계속하려면 "삭제"라고 입력하세요.`);
-  if (typed === null) return;
-  if (typed.trim() !== "삭제") return setMsg("info", "입력이 \"삭제\"와 달라 아무것도 지우지 않았습니다.");
-  const btn = $('b-del-vis'); btn.disabled = true; let done = 0, failed = 0;
-  for (const r of rows) {
-    try { await deleteDoc(doc(db, COLLECTION, r.id)); ROWS = ROWS.filter(x => x.id !== r.id); done++; }
-    catch (err) { failed++; }
-    btn.textContent = `삭제 중… ${done + failed}/${rows.length}`;
-  }
-  btn.disabled = false; btn.textContent = "보이는 결과 모두 삭제"; render();
-  setMsg(failed ? "err" : "ok", failed ? `${done}건을 삭제했고 ${failed}건은 지우지 못했습니다. 새로고침 후 다시 시도하세요.` : `${done}건을 삭제했습니다.`);
+  const ss = visibleSess(), ps = visibleParts();
+  if (!ss.length && !ps.length) return msg('data-msg', "info", "지울 기록이 없습니다.");
+  const typed = prompt(`보이는 세션 ${ss.length}개(회차 기록 포함)와 결과 문서 ${ps.length}개를 영구 삭제합니다. 되돌릴 수 없습니다.\n먼저 CSV를 받아 두었는지 확인하세요.\n\n계속하려면 "삭제"라고 입력하세요.`);
+  if (typed === null) return; if (typed.trim() !== "삭제") return msg('data-msg', "info", "입력이 \"삭제\"와 달라 아무것도 지우지 않았습니다.");
+  let fail = 0;
+  for (const s of ss) { try { for (const t of Object.keys(TRIALS[s.uid] || {})) await deleteDoc(doc(db, "sessions", s.uid, "trials", t)); await deleteDoc(doc(db, "sessions", s.uid)); } catch (e) { fail++; } }
+  for (const p of ps) { try { await deleteDoc(doc(db, "participants", p.id)); } catch (e) { fail++; } }
+  msg('data-msg', fail ? "err" : "ok", fail ? `일부(${fail}건)를 지우지 못했습니다.` : "삭제했습니다."); loadAll();
 };
-$('f-ver').onchange = render;
-$('f-cond').onchange = render; $('f-q').oninput = render; $('b-reload').onclick = loadData;
+['f-cond','f-ver','f-test'].forEach(id => $(id).onchange = render); $('f-q').oninput = render; $('b-reload').onclick = loadAll;
 </script>
 </body>
 </html>
