@@ -293,7 +293,12 @@ async function verifyServer(R){
   for (const r of R) { const t = tid(r.trial), cu = S.cues[r.template + "/" + t];
     if (!cu || PUBLIC.some(k => cu[k] !== r[k]) || Object.keys(cu).length !== PUBLIC.length) bad++;
     for (const c of CONDS) { const o = S.out[r.template + "/" + c + "/" + t];
-      if (!o || o.D !== r["D_" + c] || o.Y !== r.Y || o.left_actual !== r.left_actual || o.right_actual !== r.right_actual) bad++; } }
+      if (!o || Object.keys(o).length !== 6 || o.D !== r["D_" + c] || o.Y !== r.Y || o.left_actual !== r.left_actual || o.right_actual !== r.right_actual
+          || o.left_delay !== r.left_delay || o.right_delay !== r.right_delay) bad++; }
+    const rs = S.res[r.template + "/" + t];   // 연구자용 값(F·EV 등)도 원본과 대조
+    if (!rs || rs.item_id !== r.item_id || rs.F !== r.F || rs.F_wrong !== r.F_wrong || rs.actual_gap !== r.actual_gap
+        || Math.round(rs.EV_left * 100) !== r.EV_left100 || Math.round(rs.EV_right * 100) !== r.EV_right100 || Math.round(rs.EV_gap * 100) !== r.EV_gap100
+        || rs.D_early !== r.D_early || rs.D_late !== r.D_late || rs.D_control !== r.D_control) bad++; }
   STIM = S; return bad;
 }
 async function loadStim(){
