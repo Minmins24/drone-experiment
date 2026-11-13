@@ -3,18 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="only light">
 <title>드론 경로 선택 실험</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231d2a33'/%3E%3Ccircle cx='9' cy='9' r='4' fill='none' stroke='%23f2b33d' stroke-width='2'/%3E%3Ccircle cx='23' cy='9' r='4' fill='none' stroke='%23f2b33d' stroke-width='2'/%3E%3Ccircle cx='9' cy='23' r='4' fill='none' stroke='%23f2b33d' stroke-width='2'/%3E%3Ccircle cx='23' cy='23' r='4' fill='none' stroke='%23f2b33d' stroke-width='2'/%3E%3Crect x='12' y='12' width='8' height='8' rx='2' fill='%23f2b33d'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 :root{
+  color-scheme:only light;   /* 휴대폰 브라우저의 강제 어둡게 보기(정답·오답 색 왜곡) 방지 */
   --bg:#eef0ec; --surface:#fbfbf9; --ink:#1d2a33; --muted:#5d6a72; --line:#d5d9d4;
   --accent:#d98e04; --ok:#2f7d5b; --bad:#b4442f;
   --radius:14px; --shadow:0 1px 2px rgba(20,30,40,.06),0 8px 24px rgba(20,30,40,.08);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+body{word-break:keep-all;overflow-wrap:anywhere;font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   background:var(--bg);color:var(--ink);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
 button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 [hidden]{display:none!important}
@@ -101,6 +103,8 @@ input[type=range].untouched::-moz-range-thumb{opacity:0}
 .mark.ok{color:#2f7d5b}.mark.bad{color:#b4442f}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:10px 0;font-size:15px}
 .kv dt{color:var(--muted);font-weight:600}.kv dd{font-weight:700}
+.dev-box{background:var(--surface)}.dev-h{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}.dev-h b{font-size:16px}
+.toast{position:fixed;left:12px;right:12px;max-width:560px;margin:0 auto;top:calc(12px + env(safe-area-inset-top));z-index:60;background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-weight:650;font-size:15px;box-shadow:0 6px 24px rgba(0,0,0,.25)}
 .box.inapp{border:2px solid var(--accent);background:#fff7e2}
 button,.opt,.pick,.lk button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .file-btns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
@@ -152,6 +156,11 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
 @media (max-height:520px) and (orientation:landscape){
   body.gl-on #s-trial .card{max-height:86vh;max-height:86dvh;max-width:820px}
 }
+@media (max-width:360px){
+  .screen{padding-left:10px;padding-right:10px} .card{padding:18px 10px} h1{font-size:19px}
+  .cue-grid,.pick-row,.res-grid{gap:6px} .route{padding:10px 6px 6px} .attr .k{font-size:12px} .attr .v{font-size:18px}
+  .lk{gap:3px} .lk button{min-height:40px;font-size:14px} .pick{font-size:15px;padding:6px} .btn{font-size:16px;padding:0 14px}
+}
 @media (max-width:420px){ .card{padding:22px 14px} h1{font-size:20px} .lk{gap:4px} .lk button{min-height:42px}
   .route{padding:12px 8px 8px} .attr .v{font-size:21px} .res .v{font-size:21px} }
 </style>
@@ -175,19 +184,15 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     <h1>참여해 주셔서 감사합니다</h1>
     <p id="start-dur"></p>
     <div class="box"><ul>
-      <li><b>PC·노트북</b>(크롬·엣지·사파리), <b>아이폰</b>(사파리), <b>갤럭시</b>(크롬·삼성 인터넷)에서 참여할 수 있습니다.</li>
+      <li><b>PC·노트북, 스마트폰, 태블릿</b> 모두 참여할 수 있습니다. 최신 브라우저(Chrome, Safari, Edge, 삼성 인터넷 등)를 사용해 주세요.</li>
       <li>진행 중 연결이 끊기거나 창을 닫아도, <b>같은 기기·같은 브라우저</b>로 이 주소를 다시 열면 이어서 진행됩니다.</li>
       <li>조용한 곳에서 끝까지 한 번에 진행해 주세요.</li>
     </ul></div>
-    <div class="box" id="mobile-tips" hidden><b>스마트폰으로 참여하시나요?</b><ul style="margin-top:6px">
-      <li>화면을 <b>세로</b>로 두고 진행해 주세요.</li>
-      <li>와이파이 또는 안정적인 데이터 연결, 충분한 배터리(20% 이상)를 확인해 주세요.</li>
-      <li>도중에 알림·전화로 진행이 끊기지 않게 <b>방해 금지(집중 모드)</b>를 켜 두시면 좋습니다.</li>
-      <li>다른 앱으로 넘어가지 말고 이 화면에서 끝까지 진행해 주세요.</li>
-    </ul></div>
+    <div class="box dev-box" id="dev-box"><div class="dev-h"><span class="muted">지금 사용 중인 기기</span><b id="dev-name"></b></div>
+      <ul id="dev-tips" style="margin-top:8px"></ul></div>
     <div class="box inapp" id="file-box" hidden>
       <b id="file-title">지금은 파일 미리보기로 열려 있어 실험을 진행할 수 없습니다</b>
-      <p style="margin:6px 0" id="file-text">내려받은 <b>index.html 파일</b>을 직접 열면(메신저·Claude 앱·파일 앱의 미리보기 등) 실험 서버에 연결되지 않습니다. 아래 <b>실험 주소</b>를 Safari(아이폰) 또는 Chrome·삼성 인터넷(갤럭시)에서 열어 주세요.</p>
+      <p style="margin:6px 0" id="file-text">내려받은 <b>index.html 파일</b>을 직접 열면(메신저·Claude 앱·파일 앱의 미리보기 등) 실험 서버에 연결되지 않습니다. 아래 <b>실험 주소</b>를 <span class="dev-rec">기본 브라우저</span>에서 열어 주세요.</p>
       <p style="margin:6px 0;word-break:break-all"><a id="official-link" href="#" target="_blank" rel="noopener"></a></p>
       <div class="btn-row" style="margin-top:8px">
         <a class="btn btn-primary" id="b-official" href="#" target="_blank" rel="noopener" style="text-decoration:none">실험 주소로 열기</a>
@@ -197,7 +202,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     </div>
     <div class="box inapp" id="inapp-box" hidden>
       <b id="inapp-title">앱 안의 브라우저로 열려 있습니다</b>
-      <p style="margin:6px 0">카카오톡·네이버·인스타그램 등 <b>앱 안에서 열린 화면</b>에서는 진행이 끊기거나 결과 파일 저장이 되지 않을 수 있습니다. <b id="inapp-browser">기본 브라우저</b>로 열어 주세요.</p>
+      <p style="margin:6px 0">카카오톡·네이버·인스타그램 등 <b>앱 안에서 열린 화면</b>에서는 진행이 끊기거나 결과 파일 저장이 되지 않을 수 있습니다. <b id="inapp-browser">기본 브라우저</b>에서 열어 주세요.</p>
       <p class="muted" id="inapp-how" style="margin-bottom:8px"></p>
       <div class="btn-row" style="margin-top:8px">
         <button class="btn btn-primary" id="b-external">다른 브라우저로 열기</button>
@@ -205,7 +210,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       </div>
       <p class="muted" id="inapp-copied" style="margin-top:6px"></p>
     </div>
-    <p class="muted" id="device-note"></p>
+    
     <div class="err" id="start-err"></div>
     <div class="btn-row"><button class="btn btn-primary" id="b-start">시작하기</button></div>
   </div>
@@ -372,7 +377,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     <div class="status wait" id="up-status"><span class="dot"></span><span id="up-text">결과를 저장하는 중입니다…</span></div>
     <div class="btn-row" id="retry-row" hidden><button class="btn btn-primary" id="b-retry">다시 보내기</button></div>
     <p id="end-guide"><b>결과 파일 보내기</b>를 누르면 문자·메신저 등으로 결과 파일 3개를 바로 보낼 수 있습니다. 보내기가 안 되면 <b>파일 다운로드</b>로 저장한 뒤 실험자에게 보내 주세요.</p>
-    <p class="muted" id="end-ios-tip">아이폰·아이패드에서 내려받은 파일은 <b>파일</b> 앱 → <b>둘러보기</b> → <b>iCloud Drive</b> → <b>다운로드</b> 폴더에 있습니다.</p>
+    <p class="muted" id="end-ios-tip"></p>
     <div class="btn-row">
       <button class="btn btn-primary" id="b-share">결과 파일 보내기</button>
       <button class="btn btn-ghost" id="b-download">파일 다운로드</button>
@@ -392,7 +397,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
   function show(title, detail){
     var box = document.getElementById('boot-err'); if (!box) return;
     if (!shown) { box.innerHTML = '<b style="color:#b4442f">' + title + '</b><br>' +
-      'PC·노트북의 <b>Chrome</b> 또는 <b>Edge</b> 최신 버전으로 다시 열어 주세요. 메신저 안에서 열었다면 <b>다른 브라우저로 열기</b>를 눌러 주세요. 문제가 계속되면 이 화면을 캡처해 실험자에게 보내 주세요.' +
+      '브라우저를 최신 버전으로 업데이트한 뒤 다시 열어 주세요(PC는 <b>Chrome·Edge</b>, 아이폰·아이패드는 <b>Safari</b>, 안드로이드는 <b>Chrome·삼성 인터넷</b>). 메신저 안에서 열었다면 <b>다른 브라우저로 열기</b>를 눌러 주세요. 문제가 계속되면 이 화면을 캡처해 실험자에게 보내 주세요.' +
       '<div id="boot-err-d" style="margin-top:8px;font-size:12px;color:#5d6a72;word-break:break-all"></div>'; }
     shown = true; box.style.display = 'block';
     var d = document.getElementById('boot-err-d'); if (d && detail) d.textContent += detail + ' / ';
@@ -412,7 +417,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
 </script>
 <script nomodule>
 document.getElementById('boot-err').style.display = 'block';
-document.getElementById('boot-err').innerHTML = '<b style="color:#b4442f">이 브라우저에서는 실험을 실행할 수 없습니다.</b><br>PC·노트북의 Chrome 또는 Edge 최신 버전으로 다시 열어 주세요.';
+document.getElementById('boot-err').innerHTML = '<b style="color:#b4442f">이 브라우저에서는 실험을 실행할 수 없습니다.</b><br>브라우저를 최신 버전으로 업데이트한 뒤 다시 열어 주세요(PC는 Chrome·Edge, 아이폰·아이패드는 Safari, 안드로이드는 Chrome·삼성 인터넷).';
 </script>
 <script type="module">
 /* 3D 라이브러리(three.js 0.160.0)를 여러 곳에서 차례로 시도. 모두 실패하거나 WebGL이 없으면 같은 과제를 2D 화면으로 진행(view=2d로 기록) */
@@ -440,7 +445,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.5",
+  appVersion: "v7.8.1",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -463,13 +468,13 @@ const CONFIG = {
   comprehensionMaxAttempts: 2,   // 이해 확인: 1회 설명 후 재시도 1번 (C42). 두 번 모두 4/4가 아니면 문항별 정답·해설을 자세히 보여 준 뒤 과제 진행
                                  // (사전 고정 규칙: 탈락시키지 않음. comp_passed=0, comp_reviewed=1로 기록해 분석에서 보고·민감도 분석에 사용)
   aidRule: "계산기는 제공하지 않습니다. 필요하면 종이에 메모해도 됩니다.",   // 외부 보조 허용 규칙: 모든 조건 동일 (C39)
-  expectedMinutes: "약 25분",
+  expectedMinutes: "약 10분",
   consent: {
     title: "드론의 경로 선택에 대한 판단과 신뢰 연구",
-    researcher: "○○대학교 ○○학과 연구자 이름",
-    contact: "연구자 이메일 또는 전화번호",
-    irb: "IRB 승인번호 또는 심의 면제 확인 번호",
-    reward: "참여 보상: 연구 안내문에 적힌 기준에 따릅니다."   // 금액·성과 보상·중도 종료 규칙은 윤리 승인 후 기입 (C63·C64)
+    researcher: "김민서 (영남대학교 심리학과)",
+    contact: "kjiwon02@naver.com",
+    irb: "",   // IRB 승인번호·심의 면제 번호가 생기면 여기에 적기 (비어 있으면 동의서에 '심의' 줄을 표시하지 않음)
+    reward: "참여 보상: 연구 종료 후 참여자 중 추첨을 통해 10명에게 각 1만 원을 드립니다. 당첨 안내는 입력하신 전화번호로 연락드립니다."
   }
 };
 
@@ -586,6 +591,42 @@ const INAPP = /KAKAOTALK/i.test(UA) ? "kakaotalk" : /NAVER\(inapp|NAVER\/|whale\
   : /FBAN|FBAV|FB_IAB/i.test(UA) ? "facebook" : /\bLine\//i.test(UA) ? "line" : /DaumApps|DaumDevice/i.test(UA) ? "daum" : /BAND\//i.test(UA) ? "band"
   : /everytime/i.test(UA) ? "everytime" : (OS === "android" && /; wv\)/.test(UA)) ? "android_webview" : "";
 const IS_MOBILE = () => S.device === "mobile" || S.device === "tablet";
+/* 기기·브라우저별 안내 문구 (아이폰·아이패드 / 갤럭시 / 그 밖의 안드로이드 / Windows / Mac). 크롬 최신판은 휴대폰 모델명을 숨기므로
+   갤럭시인지 알 수 없는 안드로이드는 '안드로이드 휴대폰'으로 보고 갤럭시와 다른 기종의 안내를 함께 보여 줌 */
+const BROWSER = INAPP ? "앱 안 브라우저" : /SamsungBrowser/i.test(UA) ? "삼성 인터넷" : /EdgiOS|EdgA|Edg\//i.test(UA) ? "Edge" : /Whale/i.test(UA) ? "웨일"
+  : /FxiOS|Firefox/i.test(UA) ? "Firefox" : /CriOS/i.test(UA) ? "Chrome" : /OPR\/|Opera/i.test(UA) ? "Opera" : /Chrome\//i.test(UA) ? "Chrome" : /Safari\//i.test(UA) ? "Safari" : "브라우저";
+const IS_IPAD = /iPad/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+let IS_GALAXY = OS === "android" && (/SamsungBrowser|SAMSUNG|SM-[A-Z0-9]/i.test(UA));
+function makeDev(){
+  if (OS === "ios") {
+    const d = IS_IPAD ? "iPad" : "iPhone";
+    return { name: d, rec: "Safari", recLong: `${d}의 Safari`,
+      tips: [`화면 오른쪽 위에서 아래로 쓸어내려${IS_IPAD ? "" : "(홈 버튼이 있는 iPhone은 화면 아래에서 위로 쓸어올려)"} <b>제어 센터</b>를 열고, <b>화면 방향 잠금(자물쇠)</b>을 켜 ${IS_IPAD ? "화면이 돌아가지 않게 해" : "<b>세로 화면</b>으로 고정해"} 주세요.`,
+             "같은 제어 센터에서 <b>집중 모드 → 방해 금지</b>를 켜면 알림·전화로 진행이 끊기지 않습니다.",
+             "다른 앱으로 넘어가거나 화면 왼쪽 끝을 밀어 <b>뒤로 가기</b>를 하지 말고 이 화면에서 끝까지 진행해 주세요."],
+      files: BROWSER === "Safari" || INAPP ? `<b>파일</b> 앱 → <b>둘러보기</b> → <b>나의 ${d}</b>(또는 <b>iCloud Drive</b>) → <b>다운로드</b> 폴더`
+        : `<b>파일</b> 앱 → <b>둘러보기</b> → <b>나의 ${d}</b> → <b>${esc(BROWSER)}</b> 폴더(또는 <b>다운로드</b> 폴더)`,
+      kakao: "화면 오른쪽 아래 <b>⋯</b>(또는 공유) 버튼 → <b>Safari로 열기</b>",
+      generic: "화면의 <b>⋯</b> 또는 <b>공유</b> 메뉴 → <b>Safari로 열기</b>(또는 <b>기본 브라우저로 열기</b>)" };
+  }
+  if (OS === "android") {
+    const tab = !/Mobile/i.test(UA), d = IS_GALAXY ? (tab ? "갤럭시 탭" : "갤럭시") : (tab ? "안드로이드 태블릿" : "안드로이드 휴대폰");
+    return { name: d, rec: IS_GALAXY ? "삼성 인터넷 또는 Chrome" : "Chrome", recLong: IS_GALAXY ? "삼성 인터넷 또는 Chrome" : "Chrome(갤럭시는 삼성 인터넷도 가능)",
+      tips: ["화면 위에서 아래로 두 번 쓸어내려 <b>빠른 설정</b>을 열고, <b>자동 회전</b>을 끄고 <b>세로 화면</b>으로 진행해 주세요.",
+             "같은 빠른 설정에서 <b>방해 금지</b>를 켜면 알림·전화로 진행이 끊기지 않습니다.",
+             "다른 앱으로 넘어가거나 <b>뒤로 가기</b>(◁ 버튼 또는 화면 가장자리 밀기)를 하지 말고 이 화면에서 끝까지 진행해 주세요."],
+      files: IS_GALAXY ? "<b>내 파일</b> 앱 → <b>다운로드</b> 폴더" : "<b>Files</b>(파일) 앱 → <b>다운로드</b> 폴더 (갤럭시는 <b>내 파일</b> 앱 → <b>다운로드</b>)",
+      kakao: "화면의 <b>⋮</b>(점 3개) 메뉴 → <b>다른 브라우저로 열기</b>",
+      generic: "화면의 <b>⋮</b>(점 3개) 메뉴 → <b>다른 브라우저로 열기</b> 또는 <b>Chrome에서 열기</b>" };
+  }
+  const mac = /Macintosh|Mac OS X/.test(UA), win = /Windows/.test(UA), cros = /CrOS/.test(UA);
+  return { name: mac ? "Mac" : win ? "Windows PC" : cros ? "Chromebook" : "PC·노트북", rec: mac ? "Safari 또는 Chrome" : "Chrome 또는 Edge", recLong: mac ? "Safari 또는 Chrome" : "Chrome 또는 Edge",
+    tips: ["브라우저 창을 <b>최대화</b>하고, 다른 탭이나 프로그램으로 옮겨 가지 말고 끝까지 진행해 주세요.",
+           "노트북은 <b>전원을 연결</b>하거나 배터리가 충분한지 확인해 주세요."],
+    files: mac ? "<b>Finder</b> → <b>다운로드</b> 폴더" : cros ? "<b>파일</b> 앱 → <b>다운로드</b> 폴더" : win ? "<b>파일 탐색기</b> → <b>다운로드</b> 폴더" : "<b>다운로드</b> 폴더",
+    kakao: "창 위쪽 메뉴에서 <b>기본 브라우저로 열기</b>", generic: "메뉴에서 <b>기본 브라우저로 열기</b>" };
+}
+let DEV = makeDev();
 
 /* =====================================================================
    서버 연결: Firebase(익명 로그인 + Firestore). 보안 규칙이 단계 순서와 공개 범위를 강제함.
@@ -907,7 +948,7 @@ async function net(label, fn, opts = {}){
       $('net-text').textContent = (code === "permission-denied"
         ? "서버가 이 요청을 거부했습니다. 다시 시도해도 계속되면 이 화면을 캡처해 실험자에게 알려 주세요."
         : label === "init" && attempt >= 2
-          ? `실험 서버에 연결하지 못했습니다. 와이파이·데이터 연결을 확인하고, 메신저·앱 안이 아닌 Safari(아이폰) 또는 Chrome(갤럭시)에서 실험 주소(${CONFIG.officialUrl})로 열어 주세요.`
+          ? `실험 서버에 연결하지 못했습니다. ${IS_MOBILE() ? "와이파이·데이터" : "인터넷"} 연결을 확인하고, 메신저·앱 안이 아닌 ${DEV.recLong}에서 실험 주소(${CONFIG.officialUrl})로 열어 주세요.`
           : "연결이 원활하지 않습니다. 입력한 내용은 그대로 남아 있습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")
         + ` (오류: ${String(code).slice(0, 60)})`;
       $('net').hidden = false;
@@ -992,8 +1033,24 @@ function cueHTML(c){
    1. 시작 · 이어가기
    ===================================================================== */
 $('start-dur').textContent = `${CONFIG.expectedMinutes}이 걸립니다.`;
-$('device-note').textContent = `감지된 기기: ${({ pc: "PC·노트북", mobile: "스마트폰", tablet: "태블릿" })[S.device]}${OS === "ios" ? " (iOS)" : OS === "android" ? " (Android)" : ""}`;
-if (IS_MOBILE()) $('mobile-tips').hidden = false;
+function renderDev(){
+  $('dev-name').textContent = `${DEV.name} · ${BROWSER}`;
+  $('dev-tips').innerHTML = DEV.tips.map(t => `<li>${t}</li>`).join("") + (IS_MOBILE() ? "<li>와이파이 또는 안정적인 데이터 연결과 충분한 배터리(20% 이상)를 확인해 주세요.</li>" : "");
+  document.querySelectorAll('.dev-rec').forEach(e => e.textContent = DEV.recLong);
+  $('end-ios-tip').innerHTML = `이 기기(${esc(DEV.name)})에서 저장한 파일은 ${DEV.files}에 있습니다.`;
+  if (INAPP) {
+    $('inapp-browser').textContent = DEV.recLong;
+    $('inapp-how').innerHTML = `버튼이 작동하지 않으면: ${INAPP === "kakaotalk" ? DEV.kakao : DEV.generic}를 눌러 주세요. 그래도 안 되면 <b>주소 복사</b>를 누른 뒤 ${esc(DEV.rec)} 앱을 직접 열어 주소창에 붙여 넣어 주세요.`;
+  }
+}
+renderDev();
+/* 안드로이드 Chrome·Edge 최신판은 기본 정보에서 휴대폰 모델명을 숨김("Android 10; K") → 브라우저가 허용하면 모델명을 따로 물어
+   삼성(SM-) 모델이면 갤럭시 안내로 바꿈. 지원하지 않거나 거절되면 지금 안내(안드로이드 공통 + 갤럭시 위치 병기)를 그대로 둠 */
+if (OS === "android" && !IS_GALAXY && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+  navigator.userAgentData.getHighEntropyValues(["model"]).then(h => {
+    if (h && /^SM-|Galaxy/i.test(h.model || "")) { IS_GALAXY = true; DEV = makeDev(); renderDev(); }
+  }).catch(() => {});
+}
 // 내려받은 파일을 직접 열었거나(file:) 미리보기 안에서 열린 경우(출처 없음): 서버 연결·로그인 유지가 되지 않으므로 실험 주소로 안내하고 시작을 막음
 const BAD_ORIGIN = !PREVIEW && (!/^https?:$/.test(location.protocol) || window.origin === "null");
 // 실험 주소가 아닌 다른 웹 주소(앱의 미리보기 서버 등)에서 열린 경우: 안내만 하고 시작은 막지 않음
@@ -1001,26 +1058,21 @@ const OTHER_HOST = !PREVIEW && !BAD_ORIGIN && (() => { try { return location.hos
 if (BAD_ORIGIN || OTHER_HOST) {
   $('file-box').hidden = false;
   if (BAD_ORIGIN) { $('b-start').disabled = true; $('b-start').textContent = "실험 주소에서 열어 주세요"; }
-  else { $('file-title').textContent = "실험 주소가 아닌 곳에서 열려 있습니다"; $('file-text').innerHTML = "이 화면이 미리보기 화면이라면 실험 서버에 연결되지 않을 수 있습니다. 아래 <b>실험 주소</b>를 Safari(아이폰) 또는 Chrome·삼성 인터넷(갤럭시)에서 열어 주세요."; }
+  else { $('file-title').textContent = "실험 주소가 아닌 곳에서 열려 있습니다"; $('file-text').innerHTML = `이 화면이 미리보기 화면이라면 실험 서버에 연결되지 않을 수 있습니다. 아래 <b>실험 주소</b>를 ${esc(DEV.recLong)}에서 열어 주세요.`; }
   $('official-link').textContent = CONFIG.officialUrl; $('official-link').href = CONFIG.officialUrl; $('b-official').href = CONFIG.officialUrl;
   $('b-copy-official').onclick = async () => {
-    try { await navigator.clipboard.writeText(CONFIG.officialUrl); $('official-copied').textContent = "주소를 복사했습니다. Safari 또는 Chrome 주소창에 붙여 넣어 주세요."; }
+    try { await navigator.clipboard.writeText(CONFIG.officialUrl); $('official-copied').textContent = `주소를 복사했습니다. ${DEV.rec} 주소창에 붙여 넣어 주세요.`; }
     catch (e) { $('official-copied').textContent = "복사하지 못했습니다. 위 주소를 길게 눌러 복사해 주세요."; }
   };
 }
 if (INAPP) {
   $('inapp-box').hidden = false;
-  $('inapp-browser').textContent = OS === "ios" ? "Safari" : OS === "android" ? "Chrome 또는 삼성 인터넷" : "기본 브라우저";
-  $('inapp-how').textContent = INAPP === "kakaotalk"
-    ? (OS === "ios" ? "버튼이 작동하지 않으면: 화면 오른쪽 아래 공유(⋯) 버튼 → Safari를 눌러 주세요." : "버튼이 작동하지 않으면: 화면 오른쪽 아래 ⋮ 버튼 → ‘다른 브라우저로 열기’를 눌러 주세요.")
-    : (OS === "ios" ? "버튼이 작동하지 않으면: 화면의 ⋯ 또는 공유 메뉴에서 ‘Safari로 열기’를 누르거나, 주소를 복사해 Safari에 붙여 넣어 주세요."
-                    : "버튼이 작동하지 않으면: 화면의 ⋮ 메뉴에서 ‘다른 브라우저로 열기’ 또는 ‘Chrome에서 열기’를 누르거나, 주소를 복사해 Chrome에 붙여 넣어 주세요.");
   $('b-external').onclick = () => {
     const url = location.href;
     log("page", { note: "open_external:" + INAPP });
     if (INAPP === "kakaotalk") location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url);   // 카카오톡 외부 브라우저 열기(비공식이나 널리 쓰이는 방식)
     else if (OS === "android") location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
-    else $('inapp-copied').textContent = "이 앱에서는 바로 열 수 없습니다. 위 안내대로 메뉴에서 Safari로 열거나 주소를 복사해 주세요.";
+    else $('inapp-copied').textContent = `이 앱에서는 바로 열 수 없습니다. 위 안내대로 메뉴로 ${DEV.rec}에서 열거나 주소를 복사해 주세요.`;
   };
   $('b-copy-url').onclick = async () => {
     try { await navigator.clipboard.writeText(location.href); $('inapp-copied').textContent = "주소를 복사했습니다. 브라우저 주소창에 붙여 넣어 주세요."; }
@@ -1049,14 +1101,14 @@ $('b-start').onclick = async () => {
     setPhase("consent"); show('s-consent');
   } finally { if (!BAD_ORIGIN) { b.disabled = false; b.textContent = "시작하기"; } }
 };
-$('b-resume').onclick = () => resume();
+$('b-resume').onclick = () => { armLeaveGuard(); resume(); };
 
 /* =====================================================================
    2. 동의 · 3. 참가자 정보
    ===================================================================== */
 const C = CONFIG.consent;
 $('consent-body').innerHTML = `
-  <p><b>연구 제목:</b> ${esc(C.title)}<br><b>연구자:</b> ${esc(C.researcher)}<br><b>문의:</b> ${esc(C.contact)}<br><b>심의:</b> ${esc(C.irb)}</p>
+  <p><b>연구 제목:</b> ${esc(C.title)}<br><b>연구자:</b> ${esc(C.researcher)}<br><b>문의:</b> ${esc(C.contact)}${C.irb ? `<br><b>심의:</b> ${esc(C.irb)}` : ""}</p>
   <ul>
     <li>이 실험은 <b>사전에 구성된 배송 시나리오</b>와 <b>실험용 모의 드론</b>의 경로 판단을 사용합니다. 실제로 비행하는 드론이나 실제 센서·실시간 학습 기능은 없습니다.</li>
     <li>매 회차 두 배송 경로의 정보를 보고 경로를 정한 뒤, 본인의 선택을 사용할지 드론의 선택에 맡길지 정합니다. 모두 20회이며 설문을 포함해 ${esc(CONFIG.expectedMinutes)}이 걸립니다.</li>
@@ -1067,7 +1119,28 @@ $('consent-body').innerHTML = `
   </ul>`;
 $('c-agree').onchange = e => $('b-consent').disabled = !e.target.checked;
 $('b-disagree').onclick = () => show('s-declined');
-$('b-consent').onclick = () => { log("survey", { item_id: "consent", value: "agree" }); setPhase("info"); show('s-info'); };
+$('b-consent').onclick = () => { log("survey", { item_id: "consent", value: "agree" }); armLeaveGuard(); setPhase("info"); show('s-info'); };
+/* 진행 중 '뒤로 가기'(안드로이드 ◁ 버튼·제스처, 아이폰 화면 끝 밀기, PC 뒤로 버튼)로 실험 화면을 벗어나지 않게:
+   뒤로 가기를 누르면 같은 화면에 머물고 안내를 띄움. 창 닫기·새로고침 시에는 PC 브라우저가 확인 창을 띄움(휴대폰은 브라우저가 무시할 수 있음) */
+let GUARD = false, toastTimer;
+function toast(msg){ let t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 4000); }
+function armLeaveGuard(){
+  if (GUARD || PREVIEW) return; GUARD = true;
+  try { history.pushState({ exp: 1 }, ""); } catch (e) {}
+  /* 안드로이드 Chrome은 사용자의 터치 없이 추가된 기록 항목을 '뒤로 가기'에서 건너뛸 수 있음 →
+     뒤로 가기 직후 다시 넣은 항목은 다음 터치 때 한 번 더 넣어, 연속 뒤로 가기에도 화면을 지키게 함 */
+  let rearm = false;
+  document.addEventListener('pointerdown', () => { if (GUARD && rearm) { rearm = false; try { history.pushState({ exp: 1 }, ""); } catch (e) {} } }, true);
+  window.addEventListener('popstate', () => {
+    if (!GUARD) return;
+    try { history.pushState({ exp: 1 }, ""); } catch (e) {}
+    rearm = true;
+    log("page", { note: "back_pressed" });
+    toast("실험 중에는 ‘뒤로 가기’를 쓸 수 없습니다. 지금 화면에서 계속 진행해 주세요.");
+  });
+  window.addEventListener('beforeunload', e => { if (GUARD && !S.leaveOK) { e.preventDefault(); e.returnValue = ""; } });
+}
 
 document.querySelectorAll('#s-info .opts').forEach(g => g.addEventListener('click', e => {
   const b = e.target.closest('.opt'); if (!b) return;
@@ -1551,7 +1624,7 @@ async function finish(){
     }
     busy = false; $('b-retry').disabled = false; $('b-retry').textContent = "다시 보내기";
     if (saved) {
-      window.onbeforeunload = null; $('retry-row').hidden = true; clearInterval(timer);
+      window.onbeforeunload = null; S.leaveOK = true; GUARD = false; $('retry-row').hidden = true; clearInterval(timer);
       st.className = "status ok"; tx.textContent = INAPP
         ? "결과가 연구자에게 자동으로 저장되었습니다. 지금 화면(앱 안 브라우저)에서는 파일 저장이 안 될 수 있으니, 아래 버튼이 작동하지 않으면 그대로 창을 닫으셔도 됩니다."
         : "결과가 연구자에게 자동으로 저장되었습니다. 혹시 모를 유실에 대비해, 아래 버튼으로 결과 파일도 실험자에게 보내 주세요.";
@@ -1579,7 +1652,7 @@ function downloadOne(f){
   const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
-// 스마트폰은 한 번 누를 때 파일 하나만 받도록(여러 파일 연속 저장은 아이폰·갤럭시에서 막히는 경우가 있음)
+// 스마트폰·태블릿은 한 번 누를 때 파일 하나만 받도록(여러 파일 연속 저장은 휴대폰 브라우저에서 막히는 경우가 있음)
 function showFileButtons(){
   if ($('file-btns')) return;
   const box = document.createElement('div'); box.id = 'file-btns'; box.className = 'file-btns';
