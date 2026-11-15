@@ -115,7 +115,7 @@ pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:#f3f4
       <p class="sub" style="margin-top:8px"><b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>T0</th><th>위임률</th><th>평균 T</th><th>누적시간</th><th>사후 S-TIAS</th><th>주의점검</th><th>버전</th><th>상태</th></tr></thead>
+        <thead><tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>T0</th><th>위임률</th><th>평균 T</th><th>누적시간</th><th title="드론 신뢰 척도 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th>주의점검</th><th>버전</th><th>상태</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table></div>
     </section>
@@ -388,7 +388,7 @@ function render(){
     return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${esc(s.slot)}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
       <td>${esc(s.template)}</td><td class="num">${n}/20</td><td class="num">${esc(s.T0 ?? "")}</td><td class="num">${aRate}</td><td class="num">${tMean}</td><td class="num">${cum}</td>
-      <td class="num">${esc(sm.stias_mean ?? "")}</td><td>${sm.attn_pass === "" || sm.attn_pass === undefined ? "" : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
+      <td class="num">${esc(sm.tia_mean ?? sm.stias_mean ?? "")}</td><td>${sm.attn_pass === "" || sm.attn_pass === undefined ? "" : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
       <td>${esc(s.app_version)}</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td></tr>`;
   }).join("") || `<tr><td colspan="15" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
 }
