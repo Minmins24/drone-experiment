@@ -13,7 +13,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Pretendard Variable",Pretendard,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 48px}
+.wrap{max-width:1680px;margin:0 auto;padding:24px 16px 48px}
 header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
 h1{font-size:22px;font-weight:750}
 h2{font-size:16px;font-weight:750;margin-bottom:6px}
@@ -46,6 +46,16 @@ tr.dup td{background:#fff7e2}
 .flag{color:var(--bad);font-weight:700}
 pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:#f3f4f1;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:8px;max-height:260px;overflow:auto}
 [hidden]{display:none!important}
+thead tr.grp th{background:#e6e9e3;text-align:center;font-size:12px;color:var(--muted);border-left:1px solid #d5d9d4}
+th.gs,td.gs{border-left:1px solid #e1e4de}
+td.na{color:#b0b6b1}
+.btn.sm{min-height:30px;padding:0 10px;font-size:12px}
+#detail{background:#f8f9f6}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.dbox{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.dbox h3{font-size:13px;margin-bottom:6px}
+.dbox table{font-size:12px}.dbox td{padding:3px 6px;white-space:normal;vertical-align:top}.dbox td:first-child{color:var(--muted);width:55%}.dbox td{word-break:break-all}
+.trtbl td,.trtbl th{padding:3px 6px;font-size:12px;text-align:center}
 </style>
 </head>
 <body>
@@ -115,9 +125,18 @@ pre{font-family:var(--mono);font-size:12px;white-space:pre-wrap;background:#f3f4
       <p class="sub" style="margin-top:8px"><b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>T0</th><th>위임률</th><th>평균 T</th><th>누적시간</th><th title="드론 신뢰 척도 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th>주의점검</th><th>버전</th><th>상태</th></tr></thead>
+        <thead>
+          <tr class="grp"><th colspan="9">기본</th><th colspan="5">참가자</th><th colspan="3">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="4">사후</th><th></th></tr>
+          <tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>상태</th><th>버전</th>
+          <th class="gs">나이</th><th>연령대</th><th>성별</th><th>드론 경험</th><th title="기기 · 화면 방식(3D/2D)">기기·화면</th>
+          <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th>
+          <th class="gs" title="통과=1차 또는 2차에 4문항 모두 정답 / 해설 후 진행=2회 미통과">결과</th>
+          <th class="gs" title="본 과제 시작 전 신뢰(0~100)">T0</th><th title="20회 중 드론에 맡긴 비율">위임률</th><th title="회차별 신뢰(0~100) 평균">평균 T</th><th title="20회차 신뢰">마지막 T</th><th title="본인 선택이 실제로 더 빠른 경로였던 횟수">본인 정답</th><th title="실제 사용한 경로가 더 빠른 경로였던 횟수">실제 정답</th><th>누적시간</th>
+          <th class="gs" title="사후 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th title="드론 선택이 맞았다고 생각한 비율(%)">지각된 정확도</th><th title="드론이 느린 경로를 고른 회차가 있었다고 느꼈는지">오류 인식</th><th>주의점검</th>
+          <th>전체 값</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table></div>
+      <div id="detail" class="card" style="margin-top:12px" hidden></div>
     </section>
   </div>
 </div>
@@ -384,13 +403,76 @@ function render(){
   $('tbody').innerHTML = visibleSess().map(s => {
     const p = partOf(s) || {}, sm = p.summary || {}, { n, status } = sessStatus(s), tr = Object.values(TRIALS[s.uid] || {}).filter(x => "T" in x);
     const aRate = tr.length ? (tr.reduce((a, x) => a + x.A, 0) / tr.length).toFixed(2) : "", tMean = tr.length ? (tr.reduce((a, x) => a + x.T, 0) / tr.length).toFixed(1) : "";
-    const cum = tr.length ? Math.max(...tr.map(x => x.cum)) : "";
+    const cum = tr.length ? Math.max(...tr.map(x => x.cum)) : "", last = (TRIALS[s.uid] || {})[tid(20)] || {};
+    const hc = sm.H_correct_n ?? "", cc = sm.C_correct_n ?? "";
+    const td = (v, cls = "num") => `<td class="${cls}${v === "" || v === undefined || v === null ? " na" : ""}">${v === "" || v === undefined || v === null ? "–" : esc(v)}</td>`;
+    const comp = s.comp_passed === undefined ? "" : (Number(s.comp_passed) === 1 ? "통과" : "해설 후 진행");
     return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${esc(s.slot)}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
-      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td class="num">${esc(s.T0 ?? "")}</td><td class="num">${aRate}</td><td class="num">${tMean}</td><td class="num">${cum}</td>
-      <td class="num">${esc(sm.tia_mean ?? sm.stias_mean ?? "")}</td><td>${sm.attn_pass === "" || sm.attn_pass === undefined ? "" : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
-      <td>${esc(s.app_version)}</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td></tr>`;
-  }).join("") || `<tr><td colspan="15" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
+      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td><td>${esc(s.app_version)}</td>
+      ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.view].filter(Boolean).join(" · "), "")}
+      ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}
+      ${td(comp, "gs")}
+      ${td(s.T0, "num gs")}${td(aRate)}${td(tMean)}${td(last.T)}${td(hc)}${td(cc)}${td(cum)}
+      ${td(sm.tia_mean ?? sm.stias_mean, "num gs")}${td(sm.mc_accuracy)}${td(LBL.mc_error_noticed[sm.mc_error_noticed] ?? sm.mc_error_noticed, "")}<td>${sm.attn_pass === "" || sm.attn_pass === undefined ? '<span class="na">–</span>' : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
+      <td><button class="btn sm" data-detail="${esc(s.uid)}">${OPEN === s.uid ? "닫기" : "보기"}</button></td></tr>`;
+  }).join("") || `<tr><td colspan="30" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
+  document.querySelectorAll('[data-detail]').forEach(b => b.onclick = () => toggleDetail(b.dataset.detail, b));
+}
+
+/* ====================== 참가자별 전체 값 보기 ====================== */
+const LBL = {
+  age_group: { "10s": "10대", "20s": "20대", "30s": "30대", "40s": "40대", "50s": "50대", "60s": "60대 이상" },
+  gender: { male: "남성", female: "여성", na: "응답 안 함" },
+  exp_drone: { none: "없음", few: "1~2번", many: "여러 번" },
+  mc_error_noticed: { yes: "있었다", no: "없었다", unsure: "잘 모르겠다" }
+};
+const ITEM = {   // 문항 짧은 이름(전체 문구는 실험앱 화면 기준)
+  ptt_1: "신뢰하는 쪽을 더 선호", ptt_2: "R 불확실성 감당 못해 거의 불신", ptt_3: "자동화 시스템은 유능", ptt_4: "R 능력에 경계심", ptt_5: "R 돕고 지원하리라 기대 안 함", ptt_6: "하겠다고 한 일 수행 믿음",
+  ai_1: "세상을 더 낫게", ai_2: "R 강한 거부감", ai_3: "AI 기술 사용해 보고 싶음", ai_4: "R 단점이 더 많음", ai_5: "발전 기대", ai_6: "문제 해결책 제시", ai_7: "R AI 없는 기술 선호", ai_8: "R 두려움", ai_9: "AI 적용 기술 선택", ai_10: "R 새 문제 발생", ai_11: "대체로 긍정적 감정", ai_12: "R 가급적 사용 안 함"
+};
+const TIA_ITEM = ["R 속이려는 것 같다", "R 정직하지 못한 방식", "R 작동·결과 의심", "R 경계하게 됨", "R 해롭거나 위험", "확신을 가짐", "보안성 제공", "정직하다", "믿고 맡길 수 있다", "신뢰할 수 있다", "나는 신뢰할 수 있다"];
+TIA_ITEM.forEach((t, i) => { ITEM["tia_pre_" + (i + 1)] = t; ITEM["tia_" + (i + 1)] = t; });
+const GROUPS = [
+  ["참가자 정보", k => ["pid","phone","age","age_group","gender","exp_drone"].includes(k)],
+  ["배정·기기", k => ["uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","view","three_src","gl_lost","hidden_n","ua","app_version","stim_sha","total_time_s","resumed_n","notes"].includes(k)],
+  ["자동화 성향적 신뢰 (1~5점, R=역채점)", k => /^ptt_/.test(k)],
+  ["AI 태도 (1~5점, R=역채점)", k => /^ai_/.test(k)],
+  ["사전 드론 신뢰 (1~7점, R=역채점)", k => /^tia_pre_/.test(k) || /^stias_pre/.test(k)],
+  ["이해 확인", k => /^comp_/.test(k)],
+  ["본 과제 요약", k => ["T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final","H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median"].includes(k)],
+  ["사후 드론 신뢰 (1~7점, R=역채점)", k => /^tia_(\d|mean|distrust|trust)/.test(k) || /^stias_(\d|mean)/.test(k)],
+  ["사후 설문", k => /^(mc_|attn_|open_)/.test(k)],
+  ["기타", () => true]
+];
+const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)",
+  tia_pre_mean: "평균(역채점 반영)", tia_pre_distrust_mean: "불신 5문항 평균(원점수)", tia_pre_trust_mean: "신뢰 6문항 평균", tia_mean: "평균(역채점 반영)", tia_distrust_mean: "불신 5문항 평균(원점수)", tia_trust_mean: "신뢰 6문항 평균",
+  age: "만 나이", age_group: "연령대", gender: "성별", exp_drone: "드론 조종·사용 경험", phone: "전화번호", pid: "뒷자리",
+  comp_attempts: "시도 횟수", comp_score_1: "1차 맞힌 수(4문항)", comp_score_2: "2차 맞힌 수", comp_passed: "통과(1)·미통과(0)", comp_reviewed: "정답·해설 확인",
+  T0: "시작 전 신뢰", trials_done: "완료 회차", A_rate: "위임률(전체)", A_rate_1_10: "위임률 1~10회", A_rate_11_20: "위임률 11~20회", T_mean: "신뢰 평균", T_final: "20회차 신뢰",
+  H_correct_n: "본인 선택 정답 수", C_correct_n: "실제 선택 정답 수", cum_time: "누적 배송시간(초)", R_real_sum: "실제 손실 합계(초)", rt_H_median: "본인 선택 반응시간 중앙값(ms)", rt_A_median: "맡기기 반응시간 중앙값(ms)", rt_T_median: "신뢰 응답시간 중앙값(ms)",
+  mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
+let OPEN = null;
+function toggleDetail(uid, btn){
+  const panel = $('detail');
+  document.querySelectorAll('[data-detail]').forEach(b => b.textContent = "보기");
+  if (OPEN === uid) { OPEN = null; panel.hidden = true; return; }
+  OPEN = uid;
+  const s = SESS.find(x => x.uid === uid) || {}, p = partOf(s) || {}, sm = p.summary || {}, trs = TRIALS[uid] || {};
+  const cols = (p.summary_cols && p.summary_cols.length ? p.summary_cols : Object.keys(sm)).filter(k => !/^(H|A|T)_\d+$/.test(k));
+  const used = new Set(), box = [];
+  for (const [title, test] of GROUPS) {
+    const ks = cols.filter(k => !used.has(k) && test(k)); ks.forEach(k => used.add(k)); if (!ks.length) continue;
+    box.push(`<div class="dbox"><h3>${esc(title)}</h3><table>${ks.map(k => { let v = sm[k]; const L = LBL[k]; if (L && L[v]) v = L[v];
+      return `<tr><td>${esc(KEYLBL[k] || (ITEM[k] ? k.replace(/^(tia_pre|tia|ptt|ai)_/, "") + ". " + ITEM[k] : k))}</td><td>${v === "" || v === undefined ? '<span class="na">–</span>' : esc(v)}</td></tr>`; }).join("")}</table></div>`);
+  }
+  if (!Object.keys(sm).length) box.push(`<div class="dbox"><h3>설문·요약</h3><p class="sub">이 참가자는 끝까지 마치지 않아 설문·요약 값이 없습니다. 아래 회차 기록만 서버에 있습니다.</p></div>`);
+  const trows = Array.from({ length: 20 }, (_, i) => trs[tid(i + 1)]).map((x, i) => x ? `<tr><td>${i + 1}</td><td>${x.H === 0 ? "왼" : x.H === 1 ? "오" : "–"}</td><td>${x.A === 1 ? "맡김" : x.A === 0 ? "본인" : "–"}</td><td>${x.D === 0 ? "왼" : x.D === 1 ? "오" : "–"}</td><td>${x.C === 0 ? "왼" : x.C === 1 ? "오" : "–"}</td><td>${esc(x.time_C ?? "–")}</td><td>${esc(x.cum ?? "–")}</td><td>${esc(x.T ?? "–")}</td><td>${esc(x.rt_H ?? "")}</td><td>${Number(x.resumed) === 1 ? "예" : ""}</td></tr>` : "").join("");
+  box.push(`<div class="dbox" style="grid-column:1/-1"><h3>회차별 기록 (서버 저장값) · 시작 전 신뢰 T0 = ${esc(s.T0 ?? "–")}</h3><div style="overflow-x:auto"><table class="trtbl"><tr><th>회차</th><th>본인 선택 H</th><th>맡김 A</th><th>드론 D</th><th>실제 C</th><th>배송시간</th><th>누적</th><th>신뢰 T</th><th>H 반응시간(ms)</th><th>이어하기</th></tr>${trows || '<tr><td colspan="10" class="sub">회차 기록 없음</td></tr>'}</table></div></div>`);
+  panel.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:10px"><h2>전체 값 · 뒷자리 ${esc(s.pid)} · ${esc(CNAME[s.condition] || s.condition)} · ${esc(s.template)}</h2><button class="btn sm" id="b-detail-close">닫기</button></div><div class="dgrid">${box.join("")}</div>`;
+  panel.hidden = false; btn.textContent = "닫기";
+  $('b-detail-close').onclick = () => { OPEN = null; panel.hidden = true; document.querySelectorAll('[data-detail]').forEach(b => b.textContent = "보기"); };
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 /* ====================== CSV 내보내기 ====================== */
