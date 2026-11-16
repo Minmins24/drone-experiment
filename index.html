@@ -135,7 +135,7 @@ button,.opt,.pick,.lk button{-webkit-user-select:none;user-select:none;-webkit-t
 /* 3D 장면: 회차 화면에서만 표시. 정보 판은 아래쪽에 겹쳐 보이고, 이동 중에는 숨김 */
 #gl{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:none;z-index:0;background:#1a2329}
 body.gl-on #gl{display:block}
-#fade{position:fixed;inset:0;background:#0f171c;opacity:0;pointer-events:none;transition:opacity .35s;z-index:5}
+#fade{position:fixed;inset:0;background:#0f171c;opacity:0;pointer-events:none;transition:opacity .25s;z-index:5}
 #fade.on{opacity:1}
 #edge{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;transition:opacity .3s}
 #edge.ok{box-shadow:inset 0 0 0 6px #2f7d5b,inset 0 0 60px rgba(47,125,91,.55)}
@@ -498,7 +498,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.13.6",
+  appVersion: "v7.13.7",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -847,7 +847,7 @@ const BE = PREVIEW ? makeMockBackend() : makeFirebaseBackend();
    3D 창고 갈림길 (이전 앱과 같은 장면). 드론은 선택 전 갈림길 한가운데에 머물고 방향을 보여 주지 않음.
    이동 시간은 경로·지연 여부와 관계없이 모든 회차에서 같음 (배송시간은 숫자로만 전달: 실제 대기 없음)
    ===================================================================== */
-const MOVE = { approach: 2600, reveal: 1300, toCenter: 1100, turn: 700, travel: 1500, fade: 380 };
+const MOVE = { approach: 1700, reveal: 1100, toCenter: 750, turn: 500, travel: 1000, fade: 280 };   // v7.13.7: 회차당 이동 약 8.0초 → 5.6초 (드론이 방향을 가리키는 시간은 유지)
 if (PREVIEW && params.get("fast") === "1") Object.keys(MOVE).forEach(k => MOVE[k] = 40);   // 미리보기 자동 점검 전용
 let renderer, scene, camera, drone, droneArrow, rotors = [], segGroup, clock;
 const GW = 4.2, GH = 3.6, GL_L = 16, SIDE = 14, EYE = 1.6, VIEW_SHIFT = 0.17;
