@@ -116,13 +116,15 @@ td.na{color:#b0b6b1}
         </div>
       </div>
       <div class="row" style="margin-top:10px">
-        <button class="btn primary" id="b-dl-trials">회차 자료(trials_long) CSV</button>
+        <button class="btn primary" id="b-dl-total" title="참가자 정보·배정·모든 척도·연습·과제 요약·사후 설문·진행 기록 요약·20회차 자료를 한 파일에">전체(total) CSV</button>
+        <button class="btn" id="b-dl-codebook" title="전체(total) CSV의 열 이름과 뜻">열 설명(코드북) CSV</button>
+        <button class="btn" id="b-dl-trials">회차 자료(trials_long) CSV</button>
         <button class="btn" id="b-dl-sess">세션 목록 CSV</button>
         <button class="btn" id="b-dl-sum">summary CSV</button>
         <button class="btn" id="b-dl-ev">events CSV</button>
         <button class="btn danger" id="b-del-vis">보이는 기록 모두 삭제</button>
       </div>
-      <p class="sub" style="margin-top:8px"><b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
+      <p class="sub" style="margin-top:8px"><b>전체(total) CSV</b>는 참가자 1명 × 20회차를 한 줄씩(1명 = 20줄) 담고, 각 줄에 그 참가자의 모든 정보(참가자 정보·배정·기기, 사전 척도 문항별 점수와 평균, 이해 확인, 연습 선택, 과제 요약, 사후 설문, 진행 기록 요약)를 함께 붙입니다. 회차 기록이 없는 참가자도 1줄로 들어갑니다. 지금 표에 보이는 참가자만 담기므로, 전체를 받으려면 필터를 ‘전체’로 두세요. <b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
         <thead>
@@ -494,14 +496,10 @@ const TL_COLS = ["uid","pid","slot","cell","condition","template","app_version",
   "H","rt_H","rt_H_first","A","rt_A","rt_A_first","D","D_schedule_error","left_delay","right_delay","left_actual","right_actual","Y",
   "C","time_C","cum","T","rt_T","T_prev","F","F_wrong","EV_left","EV_right","H_correct","D_correct","C_correct","H_eq_F","H_eq_D",
   "R_model_H","R_real_C","integrity","resumed","net_cue_ms","net_out_ms","ts_cue","ts_H","ts_A","ts_result","ts_T"];
-$('b-dl-trials').onclick = async () => {
-  const btn = $('b-dl-trials'); btn.disabled = true; btn.textContent = "만드는 중…";
-  try {
-    if (!STIM) STIM = await loadStimFromServer();
-    const rows = [];
-    for (const s of visibleSess()) {
-      const { n, status } = sessStatus(s), tr = TRIALS[s.uid] || {};
-      for (let k = 1; k <= 20; k++) {
+/* 한 참가자(세션)의 회차 자료 행(최대 20행) — 회차 자료 CSV와 전체(total) CSV가 함께 사용 */
+function trialRowsFor(s){
+  const rows = [], { n, status } = sessStatus(s), tr = TRIALS[s.uid] || {};
+  for (let k = 1; k <= 20; k++) {
         const t = tid(k), x = tr[t]; if (!x) continue;
         const cu = STIM.cues[s.template + "/" + t] || {}, o = STIM.out[s.template + "/" + s.condition + "/" + t] || {}, rs = STIM.res[s.template + "/" + t] || {};
         const has = "T" in x, minEV = Math.min(rs.EV_left, rs.EV_right), fast = Math.min(o.left_actual, o.right_actual);
@@ -518,6 +516,16 @@ $('b-dl-trials').onclick = async () => {
           R_model_H: rs.EV_left === undefined ? "" : Math.round(((x.H === 0 ? rs.EV_left : rs.EV_right) - minEV) * 100) / 100,
           R_real_C: has ? x.time_C - fast : "", integrity }));
       }
+  return rows;
+}
+$('b-dl-trials').onclick = async () => {
+  const btn = $('b-dl-trials'); btn.disabled = true; btn.textContent = "만드는 중…";
+  try {
+    if (!STIM) STIM = await loadStimFromServer();
+    const rows = [];
+    for (const s of visibleSess()) {
+      rows.push(...trialRowsFor(s));
+
     }
     save(`trials_long_${stampNow()}.csv`, TL_COLS, rows);
     const mm = rows.filter(r => r.integrity === "MISMATCH").length;
@@ -543,6 +551,96 @@ $('b-dl-ev').onclick = () => {
   const url = URL.createObjectURL(new Blob(["﻿" + out.join("\r\n")], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement('a'); a.href = url; a.download = `events_all_${stampNow()}.csv`; document.body.appendChild(a); a.click(); a.remove();
 };
+/* ====================== 전체(total) CSV ====================== */
+const SESS_COLS = ["uid","pid","phone","slot","cell","condition","template","assign_reused","app_version","device","view","comp_passed","stim_sha","created_at","session_status","trials_done","finished","T0","rt_T0","ts_T0"];
+const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0"].includes(c));
+function parseEvents(csv){
+  const lines = String(csv || "").replace(/^﻿/, "").split("\r\n").filter(Boolean); if (lines.length < 2) return [];
+  const split = l => { const out = []; let cur = "", q = false; for (let i = 0; i < l.length; i++) { const ch = l[i];
+    if (q) { if (ch === '"') { if (l[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true; else if (ch === ",") { out.push(cur); cur = ""; } else cur += ch; } out.push(cur); return out; };
+  const h = split(lines[0]); return lines.slice(1).map(l => { const v = split(l); return Object.fromEntries(h.map((k, i) => [k, v[i] ?? ""])); });
+}
+function eventSummary(p){
+  const ev = parseEvents(p.events_csv), o = { events_n: ev.length || "" };
+  if (!ev.length) return o;
+  const pr = k => ev.find(e => e.event_type === "practice" && e.trial === k) || {};
+  o.practice_H_1 = pr("P1").value ?? ""; o.practice_rt_1 = pr("P1").rt_ms ?? ""; o.practice_H_2 = pr("P2").value ?? ""; o.practice_rt_2 = pr("P2").rt_ms ?? "";
+  o.back_pressed_n = ev.filter(e => e.note === "back_pressed").length;
+  o.visibility_hidden_n = ev.filter(e => e.event_type === "visibility" && /hidden/.test(e.value + e.note)).length;
+  o.net_error_n = ev.filter(e => e.event_type === "net_error").length;
+  o.error_n = ev.filter(e => e.event_type === "error").length;
+  o.gl_events = ev.filter(e => e.event_type === "gl").map(e => e.note).join(" | ");
+  o.resumed_events_n = ev.filter(e => e.note === "resumed").length;
+  const comp = ev.filter(e => e.event_type === "comprehension" && e.step === "score");
+  o.comp_rt_1 = comp[0] ? comp[0].rt_ms : ""; o.comp_rt_2 = comp[1] ? comp[1].rt_ms : "";
+  o.first_event_ts = ev[0].timestamp || ""; o.last_event_ts = ev[ev.length - 1].timestamp || "";
+  return o;
+}
+function totalRows(){
+  const rows = [], usedParts = new Set();
+  const sesRec = s => { const { n, status } = sessStatus(s); return { uid: s.uid, pid: s.pid, phone: (partOf(s) || {}).phone || "", slot: s.slot, cell: s.cell, condition: s.condition, template: s.template,
+    assign_reused: s.assign_reused, app_version: s.app_version, device: s.device, view: s.view ?? "", comp_passed: s.comp_passed ?? "", stim_sha: s.stim_sha ?? "",
+    created_at: s.created_at && s.created_at.toDate ? s.created_at.toDate().toISOString() : "", session_status: status, trials_done: n, finished: s.finished ? 1 : 0,
+    T0: s.T0 ?? "", rt_T0: s.rt_T0 ?? "", ts_T0: s.ts_T0 ?? "" }; };
+  const partRec = p => { const sm = Object.assign({}, p.summary || {}); Object.keys(sm).forEach(k => { if (/^(H|A|T)_\d+$/.test(k)) delete sm[k]; });   // 회차별 값은 각 줄의 회차 열에 있음
+    return Object.assign({ participant_doc: p.id || "", has_summary: p.summary ? 1 : 0 }, sm, eventSummary(p)); };
+  for (const s of visibleSess()) {
+    const p = partOf(s); if (p) usedParts.add(p.id);
+    const base = Object.assign({}, p ? partRec(p) : { has_summary: 0 }, sesRec(s));   // 서버 세션 값 우선(배정·T0)
+    const trs = trialRowsFor(s);
+    if (!trs.length) rows.push(Object.assign({}, base));
+    trs.forEach(t => { const o = Object.assign({}, base); TRIAL_ONLY.forEach(c => o[c] = t[c]); rows.push(o); });
+  }
+  // 세션 없이 결과 문서만 있는 경우(예전 버전 등)도 빠짐없이
+  for (const p of visibleParts()) if (!usedParts.has(p.id)) rows.push(Object.assign({}, partRec(p), { uid: p.uid ?? "", pid: p.pid, phone: p.phone ?? "", condition: p.condition ?? "", template: p.template ?? "", app_version: p.app_version ?? "", session_status: "세션 없음" }));
+  return rows;
+}
+function totalCols(rows){
+  const sumCols = []; rows.forEach(r => Object.keys(r).forEach(k => { if (!sumCols.includes(k)) sumCols.push(k); }));
+  const first = ["participant_doc","has_summary", ...SESS_COLS];
+  const evCols = ["events_n","practice_H_1","practice_rt_1","practice_H_2","practice_rt_2","comp_rt_1","comp_rt_2","back_pressed_n","visibility_hidden_n","net_error_n","error_n","gl_events","resumed_events_n","first_event_ts","last_event_ts"];
+  const middle = sumCols.filter(k => !first.includes(k) && !evCols.includes(k) && !TRIAL_ONLY.includes(k));
+  return [...first, ...middle, ...evCols, ...TRIAL_ONLY];
+}
+$('b-dl-total').onclick = async () => {
+  const btn = $('b-dl-total'); btn.disabled = true; btn.textContent = "만드는 중…";
+  try {
+    if (!STIM) STIM = await loadStimFromServer();
+    const rows = totalRows(); if (!rows.length) return msg('data-msg', "info", "내보낼 기록이 없습니다. 필터를 확인하세요.");
+    const cols = totalCols(rows);
+    save(`total_${stampNow()}.csv`, cols, rows);
+    const people = new Set(rows.map(r => r.uid || r.participant_doc)).size, mm = rows.filter(r => r.integrity === "MISMATCH").length;
+    msg('data-msg', mm ? "err" : "ok", `전체(total) CSV: 참가자 ${people}명, ${rows.length}줄, ${cols.length}열을 받았습니다.${mm ? ` 검증 불일치 ${mm}줄(integrity=MISMATCH)이 있습니다.` : ""}`);
+  } catch (e) { msg('data-msg', "err", `만들지 못했습니다 (${e.code || e.message}).`); }
+  finally { btn.disabled = false; btn.textContent = "전체(total) CSV"; }
+};
+/* 열 설명(코드북) */
+const CB = Object.assign({}, {
+  participant_doc: "결과 문서 ID(끝까지 마친 참가자)", has_summary: "설문·요약 있음(1)=끝까지 마침", uid: "참가자 고유 ID(파일 간 연결 열)", pid: "휴대전화 뒷자리", phone: "전화번호",
+  slot: "배정 순번", cell: "18칸 중 위치(0~17)", condition: "조건: early=초기 오류(2·4·7·9회), late=후기 오류(12·14·17·19회), control=무오류", template: "단서 템플릿", assign_reused: "중도 이탈 자리 재배정(1)",
+  app_version: "앱 버전", device: "기기(pc/mobile/tablet)", view: "화면 방식(3d/2d/3d_then_2d)", comp_passed: "이해 확인 통과(1)/해설 후 진행(0)", stim_sha: "단서 자료 확인값",
+  created_at: "배정 시각(UTC)", session_status: "완료/진행 중/중도 이탈", trials_done: "완료 회차 수", finished: "완료(1)", T0: "시작 전 신뢰(0~100)", rt_T0: "T0 응답시간(ms)", ts_T0: "T0 응답 시각",
+  events_n: "진행 기록 수", practice_H_1: "연습1 선택(0=왼,1=오)", practice_rt_1: "연습1 확정까지 시간(ms)", practice_H_2: "연습2 선택", practice_rt_2: "연습2 확정까지 시간(ms)",
+  comp_rt_1: "이해 확인 1차 소요(ms)", comp_rt_2: "이해 확인 2차 소요(ms)", back_pressed_n: "뒤로 가기 누른 횟수", visibility_hidden_n: "다른 앱·탭으로 벗어난 기록 수", net_error_n: "연결 오류 수", error_n: "처리 오류 수",
+  gl_events: "3D 관련 기록(2D 전환 이유 등)", resumed_events_n: "이어하기 기록 수", first_event_ts: "첫 기록 시각", last_event_ts: "마지막 기록 시각",
+  trial: "회차(1~20)", item_id: "자극 ID", left_base: "왼쪽 기본 배송시간(초)", left_delay_pct: "왼쪽 예상 지연확률(%)", left_penalty: "왼쪽 지연 시 추가시간(초)", right_base: "오른쪽 기본 배송시간(초)", right_delay_pct: "오른쪽 예상 지연확률(%)", right_penalty: "오른쪽 지연 시 추가시간(초)",
+  H: "본인 선택(0=왼,1=오)", rt_H: "단서 표시→본인 선택 확정(ms)", rt_H_first: "단서 표시→처음 누름(ms)", A: "드론에 맡김(1)/본인 선택 사용(0)", rt_A: "2단계 표시→확정(ms)", rt_A_first: "2단계 표시→처음 누름(ms)",
+  D: "드론 선택(0=왼,1=오)", D_schedule_error: "드론이 일부러 틀리는 회차(1)", left_delay: "왼쪽 실제 지연(1=발생)", right_delay: "오른쪽 실제 지연", left_actual: "왼쪽 실제 배송시간(초)", right_actual: "오른쪽 실제 배송시간(초)", Y: "실제로 빠른 경로(정답)",
+  C: "실제 사용 경로", time_C: "이번 회차 배송시간(초)", cum: "누적 배송시간(초)", T: "이번 회차 신뢰(0~100)", rt_T: "결과 표시→'다음'(ms)", T_prev: "직전 신뢰(1회차는 T0)",
+  F: "기대시간 기준 정답 방향", F_wrong: "기준 방향이 실제로 틀린 회차(1)", EV_left: "왼쪽 기대 배송시간", EV_right: "오른쪽 기대 배송시간",
+  H_correct: "본인 선택 정답(1)", D_correct: "드론 선택 정답(1)", C_correct: "실제 선택 정답(1)", H_eq_F: "본인 선택=기준 방향(1)", H_eq_D: "본인 선택=드론 선택(1)",
+  R_model_H: "본인 선택의 기대시간 손실(초)", R_real_C: "실제 선택의 실제 손실(초)", integrity: "서버 검증(ok/MISMATCH/incomplete)", resumed: "이 회차에 이어하기 있었음(1)",
+  net_cue_ms: "단서 받기 통신(ms)", net_out_ms: "결과 받기 통신(ms)", ts_cue: "단서 표시 시각", ts_H: "본인 선택 시각", ts_A: "맡김 결정 시각", ts_result: "결과 표시 시각", ts_T: "신뢰 응답 시각",
+  os: "운영체제", inapp: "앱 안 브라우저", screen: "화면 크기", hidden_n: "다른 앱·탭으로 벗어난 횟수", gl_lost: "3D 해제됨(1)", ua: "브라우저 정보", three_src: "3D 부품 출처", notes: "앱 내부 메모(오류·전환 등)"
+}, KEYLBL);
+Object.keys(ITEM).forEach(k => { CB[k] = (/^tia_pre_/.test(k) ? "사전 드론 신뢰 " : /^tia_/.test(k) ? "사후 드론 신뢰 " : /^ptt_/.test(k) ? "성향적 신뢰 " : "AI 태도 ") + k.replace(/^\D+_/, "") + "번: " + ITEM[k] + (/^tia/.test(k) ? " (1~7)" : " (1~5)"); });
+$('b-dl-codebook').onclick = async () => {
+  if (!STIM) try { STIM = await loadStimFromServer(); } catch (e) {}
+  const rows = totalRows(), cols = rows.length ? totalCols(rows) : [...SESS_COLS, ...TRIAL_ONLY];
+  save(`total_codebook_${stampNow()}.csv`, ["column", "description"], cols.map(c => ({ column: c, description: CB[c] || "" })));
+};
+
 $('b-del-vis').onclick = async () => {
   const ss = visibleSess(), ps = visibleParts();
   if (!ss.length && !ps.length) return msg('data-msg', "info", "지울 기록이 없습니다.");
