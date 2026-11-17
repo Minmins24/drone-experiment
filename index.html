@@ -265,7 +265,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <input type="text" id="i-pid" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="5678"></label>
     <label class="field"><span>전화번호를 입력해 주세요. (예: 010-1234-5678)</span>
       <input type="tel" id="i-phone" inputmode="tel" autocomplete="tel" maxlength="13" placeholder="010-1234-5678">
-      <span class="muted" style="display:block;font-weight:400;margin-top:6px">전화번호는 보상 지급·중복 참여 확인을 위해 결과 기록과 함께 저장됩니다.</span></label>
+      <span class="muted" style="display:block;font-weight:400;margin-top:6px">전화번호는 보상 지급을 위해 수집됩니다.</span></label>
     <label class="field"><span>만 나이를 입력해 주세요.</span>
       <input type="number" id="i-age" inputmode="numeric" min="19" max="99" placeholder="예: 22"></label>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">연령대를 선택해 주세요.</span>
@@ -275,6 +275,10 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">성별을 선택해 주세요.</span>
       <div class="opts" data-name="gender">
         <button class="opt" data-v="male">남성</button><button class="opt" data-v="female">여성</button>
+      </div></div>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">최종 학력을 선택해 주세요.</span>
+      <div class="opts" data-name="edu">
+        <button class="opt" data-v="middle_or_less">중학교 졸업 이하</button><button class="opt" data-v="high">고등학교 졸업</button><button class="opt" data-v="college">대학교 졸업</button><button class="opt" data-v="grad">대학원 재학 이상</button>
       </div></div>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">드론을 직접 조종하거나 가까이서 본 경험이 있나요?</span>
       <div class="opts" data-name="exp_drone">
@@ -498,7 +502,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.14.5",
+  appVersion: "v7.15",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -1288,11 +1292,11 @@ $('b-info').onclick = () => {
   if (!S.info.age_group) return err.textContent = "연령대를 선택해 주세요.";
   { const g = age >= 60 ? "60s" : (Math.floor(age / 10) * 10) + "s";   // 입력한 만 나이와 고른 연령대가 맞는지 확인
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
-  for (const [k, label] of [["gender","성별"],["exp_drone","드론 경험"]]) if (!S.info[k]) return err.textContent = `${label}을(를) 선택해 주세요.`;
+  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
-  for (const k of ["age","age_group","gender","exp_drone"]) log("survey", { item_id: k, value: S.info[k] });
+  for (const k of ["age","age_group","gender","edu","exp_drone"]) log("survey", { item_id: k, value: S.info[k] });
   setPhase("pre_survey");
   runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); });
 };
@@ -1694,7 +1698,7 @@ function buildSummary(rows){
   const o = {
     pid: S.pid, uid: S.uid, slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
     device: S.device, os: OS, inapp: INAPP, screen: `${screen.width}x${screen.height}@${window.devicePixelRatio || 1}`, hidden_n: HIDDEN_N, gl_lost: GL_LOST ? 1 : 0,
-    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, exp_drone: S.info.exp_drone,
+    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone,
     comp_attempts: S.comp.attempts, comp_score_1: S.comp.results[0] ?? "", comp_score_2: S.comp.results[1] ?? "", comp_passed: S.comp.passed ? 1 : 0, comp_reviewed: S.comp.reviewed ? 1 : 0,
     T0: s.T0 ?? "", trials_done: done.length,
     A_rate: r4(mean(nums("A"))), A_rate_1_10: r4(mean(win(1, 10).map(r => r.A))), A_rate_11_20: r4(mean(win(11, 20).map(r => r.A))),
@@ -1717,7 +1721,7 @@ function buildSummary(rows){
   });
   return o;
 }
-const SUM_COLS = ["pid","uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","exp_drone",
+const SUM_COLS = ["pid","uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","edu","exp_drone",
   "comp_attempts","comp_score_1","comp_score_2","comp_passed","comp_reviewed","T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final",
   "H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median","resumed_n",
   ...Array.from({ length: 20 }, (_, i) => "H_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "A_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "T_" + (i + 1)),
