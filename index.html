@@ -498,7 +498,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.14.3",
+  appVersion: "v7.14.4",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -564,9 +564,8 @@ const TRUST_Q = "현재 이 드론의 경로 선택을 얼마나 신뢰하십니
 const TRUST_Q0 = "현재 곧 사용할 드론의 경로 선택을 얼마나 신뢰하십니까?";   // 본 과제 시작 전(T0) 문구
 const TRUST_LEFT = "0 = 전혀 신뢰하지 않는다", TRUST_RIGHT = "100 = 완전히 신뢰한다";
 
-/* 실험 전 설문: 자동화 신뢰 성향 6문항(5점) + AI 태도 12문항(5점) + AI 기술적 이해 14문항(5점) + 드론 신뢰 척도 사전 11문항(7점) */
+/* 실험 전 설문: 자동화 신뢰 성향 6문항(5점) + AI 태도 12문항(5점) + 드론 신뢰 척도 사전 11문항(7점) */
 const PTT_N = 6, PTT_REVERSE = ["ptt_2", "ptt_4", "ptt_5"];                                   // 성향적 신뢰: 2·4·5번 역채점(6 − 응답)
-const AIT_N = 14;   // AI 기술적 이해 14문항(5점, 역채점 없음)
 const AI_N = 12, AI_REVERSE = ["ai_2", "ai_4", "ai_7", "ai_8", "ai_10", "ai_12"];             // AI 태도: 2·4·7·8·10·12번 역채점(6 − 응답)
 /* 드론 신뢰 척도(자동화 신뢰 11문항, 7점): 1~5번은 불신 문항 → 총점 계산 때 8 − 응답으로 역채점 */
 const TIA_N = 11, TIA_DISTRUST = [1, 2, 3, 4, 5];
@@ -596,24 +595,6 @@ const PRE_SURVEY = [
       { id: "ai_10", text: "AI는 문제를 해결하기보다는 새로운 문제를 발생시키는 경우가 많다." },
       { id: "ai_11", text: "나는 AI에 대해 대체로 긍정적인 감정을 갖고 있다." },
       { id: "ai_12", text: "나는 AI를 기반으로 한 기술을 가급적 사용하지 않으려 한다." }
-    ] },
-  { block: "P2T", type: "likert", points: 5, intro: "인공지능(AI) 기술에 대해 얼마나 알고 있는지 묻습니다. 각 문장이 지금의 나에게 얼마나 해당하는지 선택해 주세요.",
-    leftLabel: "1 = 전혀 아니다", rightLabel: "5 = 매우 그렇다",
-    items: [
-      { id: "ait_1", text: "머신러닝 모델의 학습-검증-테스트를 하는 절차와 목적을 설명할 수 있다." },
-      { id: "ait_2", text: "딥러닝이 머신러닝과 어떻게 연관되는지 설명할 수 있다." },
-      { id: "ait_3", text: "규칙 기반(Rule-based)과 학습 기반(머신러닝) 시스템의 차이를 설명할 수 있다." },
-      { id: "ait_4", text: "AI가 어떻게 의사결정을 내리는지 설명할 수 있다." },
-      { id: "ait_5", text: "머신러닝의 강화학습의 원리와 예시를 설명할 수 있다." },
-      { id: "ait_6", text: "일반적인 인공지능(General AI)과 좁은 범위의 인공지능(Narrow AI)의 차이를 설명할 수 있다." },
-      { id: "ait_7", text: "AI를 위한 데이터가 어떻게 수집되고 활용되는지 설명할 수 있다." },
-      { id: "ait_8", text: "인공 신경망이 무엇인지 설명할 수 있다." },
-      { id: "ait_9", text: "머신러닝이 어떻게 작동하는지 설명할 수 있다." },
-      { id: "ait_10", text: "머신러닝의 '지도 학습'과 '비지도 학습'의 차이를 설명할 수 있다." },
-      { id: "ait_11", text: "설명가능한 인공지능(Explainable AI, XAI)의 개념을 설명할 수 있다." },
-      { id: "ait_12", text: "인공지능이 주변 환경을 인식하고, 그에 따라 어떻게 작동하는지 설명할 수 있다." },
-      { id: "ait_13", text: "빅데이터의 개념을 설명할 수 있다." },
-      { id: "ait_14", text: "영화나 게임 속 AI와 실제 AI의 차이를 설명할 수 있다." }
     ] },
   { block: "P3", type: "likert", points: 7, intro: "과제에서 함께할 드론은 경로를 알려주는 AI 기술 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
@@ -1708,7 +1689,6 @@ function buildSummary(rows){
   const ptt = id => { const v = Number(sv[id]); return PTT_REVERSE.includes(id) ? 6 - v : v; };
   const pttIds = Array.from({ length: PTT_N }, (_, k) => "ptt_" + (k + 1));
   const aiIds = Array.from({ length: AI_N }, (_, k) => "ai_" + (k + 1));
-  const aitIds = Array.from({ length: AIT_N }, (_, k) => "ait_" + (k + 1));
   const ai = id => { const v = Number(sv[id]); return AI_REVERSE.includes(id) ? 6 - v : v; };
   const o = {
     pid: S.pid, uid: S.uid, slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
@@ -1724,12 +1704,11 @@ function buildSummary(rows){
     resumed_n: done.filter(r => Number(r.resumed) === 1).length
   };
   rows.forEach(r => { o["H_" + r.trial] = r.H ?? ""; o["A_" + r.trial] = r.A ?? ""; o["T_" + r.trial] = r.T ?? ""; });
-  Object.assign(o, Object.fromEntries(pttIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(aiIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(aitIds.map(id => [id, sv[id] ?? ""])), {
+  Object.assign(o, Object.fromEntries(pttIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(aiIds.map(id => [id, sv[id] ?? ""])), {
     ptt_mean: sv.ptt_1 === undefined ? "" : r4(mean(pttIds.map(ptt))),
     ai_mean: sv.ai_1 === undefined ? "" : r4(mean(aiIds.map(ai))),                                            // 12문항 평균(역채점 반영)
     ai_pos_mean: sv.ai_1 === undefined ? "" : r4(mean(aiIds.filter(id => !AI_REVERSE.includes(id)).map(id => Number(sv[id])))),   // 긍정 6문항(원점수)
     ai_neg_mean: sv.ai_1 === undefined ? "" : r4(mean(AI_REVERSE.map(id => Number(sv[id])))),                                      // 부정 6문항(원점수)
-    ait_mean: sv.ait_1 === undefined ? "" : r4(mean(aitIds.map(id => Number(sv[id])))),                      // AI 기술적 이해 14문항 평균
     ...tia(true), ...tia(false),
     mc_accuracy: sv.mc_accuracy ?? "", mc_error_noticed: sv.mc_error_noticed ?? "", attn_1: sv.attn_1 ?? "", attn_pass: sv.attn_1 === undefined ? "" : (Number(sv.attn_1) === 3 ? 1 : 0),
     open_1: sv.open_1 || "", total_time_s: Math.round((performance.now() - S.startT) / 1000), app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256,
@@ -1743,7 +1722,6 @@ const SUM_COLS = ["pid","uid","slot","cell","condition","template","assign_reuse
   ...Array.from({ length: 20 }, (_, i) => "H_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "A_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "T_" + (i + 1)),
   ...Array.from({ length: PTT_N }, (_, i) => "ptt_" + (i + 1)), "ptt_mean",
   ...Array.from({ length: AI_N }, (_, i) => "ai_" + (i + 1)), "ai_mean","ai_pos_mean","ai_neg_mean",
-  ...Array.from({ length: AIT_N }, (_, i) => "ait_" + (i + 1)), "ait_mean",
   "tia_pre_1","tia_pre_2","tia_pre_3","tia_pre_4","tia_pre_5","tia_pre_6","tia_pre_7","tia_pre_8","tia_pre_9","tia_pre_10","tia_pre_11","tia_pre_mean","tia_pre_distrust_mean","tia_pre_trust_mean",
   "tia_1","tia_2","tia_3","tia_4","tia_5","tia_6","tia_7","tia_8","tia_9","tia_10","tia_11","tia_mean","tia_distrust_mean","tia_trust_mean",
   "mc_accuracy","mc_error_noticed","attn_1","attn_pass","open_1","total_time_s","app_version","stim_sha","notes"];
