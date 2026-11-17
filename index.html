@@ -244,7 +244,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
   <div class="card">
     <h1>연구 참여 설명 및 동의</h1>
     <div class="box" id="consent-body"></div>
-    <label class="check"><input type="checkbox" id="c-agree"> 위 내용을 읽고 이해했으며, 연구 참여에 자발적으로 동의합니다.</label>
+    <label class="check"><input type="checkbox" id="c-agree"> 위 내용을 읽고 이해했으며, 만 19세 이상 성인으로서 연구 참여에 자발적으로 동의합니다.</label>
     <div class="err" id="consent-err"></div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="b-disagree">동의하지 않음</button>
@@ -498,7 +498,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.14.4",
+  appVersion: "v7.14.5",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -524,11 +524,11 @@ const CONFIG = {
   aidRule: "필요하다면 종이에 메모하며 과제를 진행해도 됩니다.",   // 외부 보조 허용 규칙: 모든 조건 동일 (C39)
   expectedMinutes: "약 10분",
   consent: {
-    title: "AI 드론의 경로 선택에 대한 신뢰 연구",
+    title: "드론의 경로 선택에 대한 신뢰 연구",
     researcher: "김민서",
     contact: "kjiwon02@naver.com",
     irb: "",   // IRB 승인번호·심의 면제 번호가 생기면 여기에 적기 (비어 있으면 동의서에 '심의' 줄을 표시하지 않음)
-    reward: ["연구 종료 후 참여자 중 추첨을 통해 10명에게 각 1만 원을 드립니다.", "당첨 안내는 12월 중순에 입력하신 전화번호로 연락을 드립니다."]   // 두 줄로 표시
+    reward: "보상은 추첨을 통해 10명에게 1만원을 지급하며, 12월 말에 개별 연락을 드립니다."
   }
 };
 
@@ -1225,15 +1225,16 @@ $('b-resume').onclick = () => { armLeaveGuard(); resume(); };
 const C = CONFIG.consent;
 $('consent-body').innerHTML = `
   <p><b>연구 제목:</b> ${esc(C.title)}<br><b>연구자:</b> ${esc(C.researcher)}<br><b>문의:</b> ${esc(C.contact)}${C.irb ? `<br><b>심의:</b> ${esc(C.irb)}` : ""}</p>
-  <p>이 실험은 작업 환경에서, AI 기술이 적용된 드론과 함께 상자를 운반하며 좌우 갈림길에서 더 빠른 경로를 선택하는 것으로 이루어집니다.</p>
-  <p>매 회차에서 배송 경로의 정보를 보고 스스로 더 빠른 경로를 정한 뒤, 본인의 선택을 사용할지 드론의 선택에 맡길지 정합니다.</p>
-  <p>모두 20회이며 설문을 포함해 ${esc(CONFIG.expectedMinutes)}이 걸립니다.</p>
-  <p>${C.reward.map(esc).join("<br>")}</p>
-  <ul>
-    <li>저장되는 정보: 전화번호, 나이, 성별, 드론 경험, 과제 중 선택·응답과 반응시간, 설문 응답, 기기 종류와 브라우저 정보. 이름은 저장하지 않습니다.</li>
-    <li>자료는 연구 목적으로만 사용되며, 결과는 개인을 알아볼 수 없는 통계 형태로만 발표됩니다.</li>
-    <li>참여는 자발적이며 언제든지 창을 닫아 그만둘 수 있고, 불이익은 없습니다.</li>
-  </ul>`;
+  <p>이 실험은 작업 환경 속, 드론과 함께 상자를 운반하며 좌우 갈림길을 선택하는 상황에서 드론에 대한 신뢰 형성을 알아보기 위한 졸업논문 연구입니다.</p>
+  <p>만 19세 이상 모든 성인을 대상으로 하며, ${esc(CONFIG.expectedMinutes)}이 소요됩니다.</p>
+  <p>연구 참여는 자발적으로 이루어지며, 실험에 참여하지 않거나 실험 도중 그만두더라도 불이익이 존재하지 않습니다.</p>
+  <p>실험 과정에서 화면 시청 및 움직임에 따른 눈의 피로나 어지러움이 있을 수 있습니다. 그럴 때는 잠시 쉬거나, 언제든 실험을 중단하실 수 있습니다.</p>
+  <p>본 연구에서는 이름, 학번 등의 개인을 식별할 수 있는 정보를 수집하지 않습니다. 수집된 정보는 연구 목적으로만 사용되며, 오직 연구 보상을 위해 전화번호가 수집됩니다.</p>
+  <p>${esc(C.reward)}</p>
+  <p>수집된 정보는 연구자만 열람할 수 있는 곳에 보관하며, 연구 종료 후 1년 뒤 폐기됩니다.</p>
+  <p>익명 설문이므로, 제출 이후에는 특정 응답을 구별해 삭제하기 어렵습니다.</p>
+  <p>한 기기에서 한 번만 참여가 가능하며, 모바일 기기에서 어려움이 발생한다면 PC에서 실험을 진행해주세요.</p>
+  <p>이외의 오류 발생 시 연구자 메일로 문의해주십시오.</p>`;
 $('c-agree').onchange = e => $('b-consent').disabled = !e.target.checked;
 $('b-disagree').onclick = () => show('s-declined');
 /* 진행 중 처리 오류로 흐름이 끊기면(화면은 보이는데 아무 반응이 없는 상태) 그대로 두지 않고 복구 안내를 띄움.
