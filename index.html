@@ -283,9 +283,9 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <div class="opts" data-name="edu">
         <button class="opt" data-v="middle_or_less">중학교 졸업 이하</button><button class="opt" data-v="high">고등학교 졸업</button><button class="opt" data-v="college">대학교 졸업</button><button class="opt" data-v="grad">대학원 재학 이상</button>
       </div></div>
-    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">드론을 직접 조종하거나 가까이서 본 경험이 있나요?</span>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">이전에 드론을 조종해 본 경험이 있으십니까?</span>
       <div class="opts" data-name="exp_drone">
-        <button class="opt" data-v="none">없음</button><button class="opt" data-v="few">1~2번</button><button class="opt" data-v="many">여러 번</button>
+        <button class="opt" data-v="yes">예</button><button class="opt" data-v="no">아니오</button>
       </div></div>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술이 포함된 제품 및 서비스를 얼마나 자주 사용해 보셨습니까?</span>
       <div class="opts scale" data-name="ai_use_freq">
@@ -318,12 +318,12 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <li><b>기본 배송시간</b></li>
       <li><b>예상 지연확률</b></li>
       <li><b>지연 시 추가시간</b></li>
-    </ol><p class="muted" style="margin-top:6px">각 정보를 읽는 법은 다음 화면에서 예시와 함께 자세히 안내합니다.</p></div>
+    </ol><p class="muted" style="margin-top:6px">각 정보를 읽는 법은 잠시 뒤 예시와 함께 자세히 안내합니다.</p></div>
     <h2 class="h2s">함께 일하는 드론</h2>
     <p>드론은 창고 환경의 공간적 정보와 각 경로에서 발생하는 시간 지연에 대한 과거 기록을 학습해, <b>더 빠른 경로를 추천하는 AI 기술 기반 드론</b>입니다.</p>
     <p>20번의 갈림길 상황에서 여러분은 <b>스스로의 결정</b>이나 <b>드론의 결정</b>에 따라 길을 선택할 수 있습니다.</p>
     <div class="box em">실제 작업자가 되었다고 생각하며, 매 회차 <b>가장 빠른 길</b>을 선택해 주세요.</div>
-    <div class="btn-row"><button class="btn btn-primary" id="b-scenario">다음: 경로 정보 읽는 법</button></div>
+    <div class="btn-row"><button class="btn btn-primary" id="b-scenario">다음</button></div>
   </div>
 </section>
 
@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.1",
+  appVersion: "v8.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -614,8 +614,11 @@ const PRE_SURVEY = [
       { id: "ai_10", text: "AI는 문제를 해결하기보다는 새로운 문제를 발생시키는 경우가 많다." },
       { id: "ai_11", text: "나는 AI에 대해 대체로 긍정적인 감정을 갖고 있다." },
       { id: "ai_12", text: "나는 AI를 기반으로 한 기술을 가급적 사용하지 않으려 한다." }
-    ] },
-  { block: "P3", type: "likert", points: 7, intro: "과제에서 함께할 드론은 경로를 알려주는 AI 기술 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
+    ] }
+];
+/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(3 / 3)으로 표시 */
+const DRONE_PRE_SURVEY = [
+  { block: "P3", type: "likert", points: 7, intro: "과제에서 함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
     items: [
       { id: "tia_pre_1", text: "이 드론의 경로 선택 기능은 나를 속이려는 것 같다." },
@@ -1357,18 +1360,19 @@ $('b-info').onclick = () => {
   S.events.forEach(ev => ev.pid = pid);
   for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge"]) log("survey", { item_id: k, value: S.info[k] });
   setPhase("pre_survey");
-  runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); });
+  runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); }, 0, { offset: 0, total: PRE_SURVEY.length + DRONE_PRE_SURVEY.length });
 };
 
 /* =====================================================================
    설문 (사전·사후 공용)
    ===================================================================== */
 let SV = null;
-function runSurvey(blocks, label, done, startIdx = 0){ SV = { blocks, label, done, idx: startIdx }; show('s-survey'); renderSurvey(); }
+function runSurvey(blocks, label, done, startIdx = 0, num = null){ SV = { blocks, label, done, idx: startIdx, num }; show('s-survey'); renderSurvey(); }
 function renderSurvey(){
   const blk = SV.blocks[SV.idx], card = $('survey-card'), ans = {};
   const pageT0 = performance.now(); window.scrollTo(0, 0);
-  let html = `<p class="muted">${esc(SV.label)} ${SV.idx + 1} / ${SV.blocks.length}</p>`;
+  const nOff = SV.num ? SV.num.offset : 0, nTot = SV.num ? SV.num.total : SV.blocks.length;
+  let html = `<p class="muted">${esc(SV.label)} ${SV.idx + 1 + nOff} / ${nTot}</p>`;
   if (blk.intro) html += `<h1 style="font-size:20px">${esc(blk.intro)}</h1>`;
   blk.items.forEach(it => {
     if (blk.type === "likert") {
@@ -1413,7 +1417,8 @@ function renderSurvey(){
    ===================================================================== */
 /* 과제 배경(프레이밍): 사전 설문 직후, 경로 정보 읽는 법 이전 */
 function showScenario(){ setPhase("scenario"); show('s-scenario'); }
-$('b-scenario').onclick = () => showCueIntro();
+$('b-scenario').onclick = () => { setPhase("pre_drone_survey");   // 과제 배경을 읽은 뒤, 드론의 선택을 보기 전 드론 신뢰
+  runSurvey(DRONE_PRE_SURVEY, "실험 전 설문", () => { S.dronePreDone = true; persistLocal(); showCueIntro(); }, 0, { offset: PRE_SURVEY.length, total: PRE_SURVEY.length + DRONE_PRE_SURVEY.length }); };
 function showCueIntro(){
   setPhase("cue_intro");
   $('cue-example').innerHTML = `<div class="cue-grid">${cueHTML({ left_base: 30, left_delay_pct: 40, left_penalty: 20, right_base: 45, right_delay_pct: 25, right_penalty: 15 })}</div>`;
