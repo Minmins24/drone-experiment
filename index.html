@@ -502,7 +502,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v7.15.3",
+  appVersion: "v8.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -521,7 +521,10 @@ const CONFIG = {
   conditions: ["early", "late", "control"],
   templates: ["V4-B1N", "V4-B1M", "V4-B2N", "V4-B2M", "V4-B3N", "V4-B3M"],
   errorTrials: { early: [2, 4, 7, 9], late: [12, 14, 17, 19], control: [] },   // 연구자 기록용(참가자 화면에 쓰지 않음)
-  slotTimeoutMin: 90,   // 시작 후 이 시간(분) 안에 끝내지 못한 순번은 중도 이탈로 보고 같은 칸을 다음 참가자에게 먼저 배정
+  slotTimeoutMin: 90,   // 배정 후 이 시간(분) 안에 끝내지 못한 seq는 중도 이탈로 보고, 같은 seq(같은 조건·템플릿)를 다음 참가자에게 먼저 재발급
+  // 본실험 고정 배정표(02_앱업로드용_배정표_v3_1-300명.csv). 연구자 페이지에서 서버에 올리며, 참가자 브라우저는 자기 seq의 한 행만 읽을 수 있음.
+  // 배정 시점: 시작 전 신뢰(T0) 응답 직후, 1회차 직전. 조건 코드는 서버에 올릴 때 E→early, L→late, C→control로 변환됨.
+  alloc: { version: "v3", sha256: "67ca9426d8326dbe6828c4e209b234196d74f8966a30ba31e221db5ee71e8e83", total: 300 },
   comprehensionMaxAttempts: 2,   // 이해 확인: 1회 설명 후 재시도 1번 (C42). 두 번 모두 4/4가 아니면 문항별 정답·해설을 자세히 보여 준 뒤 과제 진행
                                  // (사전 고정 규칙: 탈락시키지 않음. comp_passed=0, comp_reviewed=1로 기록해 분석에서 보고·민감도 분석에 사용)
   paused: false,   // true: 새 참가자 시작을 막음(이미 진행 중인 참가자는 이어서 끝낼 수 있음). 다시 열 때 false로
@@ -668,6 +671,7 @@ const r1 = x => Math.round(x * 10) / 10;
 /* 기기·브라우저 환경 (스마트폰·앱 안 브라우저 대응) */
 const UA = navigator.userAgent;
 const OS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) ? "ios" : /Android/i.test(UA) ? "android" : "other";
+const OS_NAME = OS !== "other" ? OS : /Windows/.test(UA) ? "windows" : /CrOS/.test(UA) ? "chromeos" : /Macintosh|Mac OS X/.test(UA) ? "macos" : /Linux/.test(UA) ? "linux" : "other";
 const INAPP = /KAKAOTALK/i.test(UA) ? "kakaotalk" : /NAVER\(inapp|NAVER\/|whale\/.*inapp/i.test(UA) ? "naver" : /Instagram/i.test(UA) ? "instagram"
   : /FBAN|FBAV|FB_IAB/i.test(UA) ? "facebook" : /\bLine\//i.test(UA) ? "line" : /DaumApps|DaumDevice/i.test(UA) ? "daum" : /BAND\//i.test(UA) ? "band"
   : /everytime/i.test(UA) ? "everytime" : (OS === "android" && /; wv\)/.test(UA)) ? "android_webview" : "";
@@ -741,18 +745,37 @@ function makeFirebaseBackend(){
     },
     async stimulusSha(){ const s = await F.fs.getDoc(d("meta", "stimulus")); return s.exists() ? s.data().sha256 : null; },
     async getSession(){ const s = await F.fs.getDoc(d("sessions", api.uid)); return s.exists() ? s.data() : null; },
+    async allocInfo(){ const x = await F.fs.getDoc(d("meta", "alloc")); return x.exists() ? x.data() : null; },
+    async markVisit(){ try { await F.fs.setDoc(d("visits", api.uid), { app_version: CONFIG.appVersion, ts: F.fs.serverTimestamp() }); } catch (e) {} },   // 첫 방문 서버 시각(소요시간 계산용). 이미 있으면 거부됨(무시)
+    /* 배정: ① meta/alloc 트랜잭션으로 seq 확보(동시 접속 시 Firestore가 재실행, 규칙이 중복·순서를 검사)
+             ② 자기 seq의 배정표 한 행만 읽음(규칙: who[내 uid] == seq 일 때만)
+             ③ 세션(T0 포함)과 배정 기록(alloc_log)을 한 번에 저장(규칙: 조건·템플릿이 배정표 행과 같아야 함) */
     async assign(base){
-      const ref = d("meta", "assign"), sref = d("sessions", api.uid);
-      return F.fs.runTransaction(F.db, async tx => {
-        const snap = await tx.get(ref), ss = await tx.get(sref);
-        if (ss.exists()) return ss.data();
-        const data = snap.exists() ? snap.data() : {};
-        const plan = planSlot(data, api.uid, Date.now());
-        tx.set(ref, plan.assignDoc);
-        const sess = Object.assign({}, base, plan.session, { created_at: F.fs.serverTimestamp() });
-        tx.set(sref, sess);
-        return Object.assign({}, sess, { created_at: null });
+      const sref = d("sessions", api.uid), aref = d("meta", "alloc");
+      const ex = await F.fs.getDoc(sref); if (ex.exists()) return ex.data();
+      const claim = noReuse => F.fs.runTransaction(F.db, async tx => {
+        const snap = await tx.get(aref);
+        if (!snap.exists()) throw Object.assign(new Error("alloc_missing"), { code: "alloc_missing" });
+        const p = allocPlan(snap.data(), api.uid, Date.now(), noReuse);
+        if (p.closed) throw Object.assign(new Error("closed"), { code: "closed" });
+        if (!p.existing) tx.update(aref, { n: p.n, [`slots.${p.k}`]: { t: F.fs.serverTimestamp(), d: false, r: p.r, u: api.uid }, [`who.${api.uid}`]: p.k });
+        return p;
       });
+      let p;
+      try { p = await claim(false); }
+      catch (e) { if (e && e.code === "permission-denied") p = await claim(true); else throw e; }   // 기기 시계가 크게 틀려 재발급 판단이 서버와 다를 때: 새 seq로
+      if (p.existing && S.allocPrev && S.allocPrev.k === p.k) p.prev = S.allocPrev.prev;
+      S.allocPrev = { k: p.k, prev: p.prev }; persistLocal();
+      const row = await F.fs.getDoc(d("alloc", String(p.k)));
+      if (!row.exists()) throw Object.assign(new Error("alloc_row_missing"), { code: "alloc_row_missing" });
+      const r = row.data();
+      const sess = Object.assign({}, base, deviceInfo(), { seq: p.k, alloc: CONFIG.alloc.version, condition: r.condition, template: r.template, assign_reused: p.r, created_at: F.fs.serverTimestamp() });
+      const b = F.fs.writeBatch(F.db);
+      b.set(sref, sess);
+      b.set(d("alloc_log", `${p.k}_${p.r}`), { type: p.r ? "reissue" : "assign", seq: p.k, r: p.r, uid: api.uid, prev_uid: p.prev || "",
+        reason: p.r ? `timeout_${CONFIG.slotTimeoutMin}min_unfinished` : "", app_version: CONFIG.appVersion, ts: F.fs.serverTimestamp() });
+      await b.commit();
+      return Object.assign({}, sess, { created_at: null });
     },
     setT0: v => F.fs.updateDoc(d("sessions", api.uid), v),
     async listTrials(){ const q = await F.fs.getDocs(F.fs.collection(F.db, "sessions", api.uid, "trials")); const o = {}; q.forEach(x => o[x.id] = x.data()); return o; },
@@ -766,7 +789,10 @@ function makeFirebaseBackend(){
       const b = F.fs.writeBatch(F.db);
       const pref = d("participants", rec.id);
       b.set(pref, Object.assign({}, rec.doc, { created_at: F.fs.serverTimestamp() }));
-      if (rec.slot != null && !rec.noSlotDoc) b.update(d("meta", "assign"), { [`slots.${rec.slot}.d`]: true });
+      if (rec.seq != null && !rec.noSlotDoc) {   // 본실험: 자기 seq를 완료로 표시(그 seq가 다른 사람에게 재발급된 경우에는 표시하지 않음)
+        const a = await F.fs.getDoc(d("meta", "alloc")), sl = a.exists() ? ((a.data().slots || {})[rec.seq] || {}) : {};
+        if (sl.u === api.uid) b.update(d("meta", "alloc"), { [`slots.${rec.seq}.d`]: true });
+      }
       b.update(d("sessions", api.uid), { finished: true, ts_finished: isoLocal() });
       try { await b.commit(); }
       catch (e) {
@@ -778,26 +804,35 @@ function makeFirebaseBackend(){
   return api;
 }
 
-/* 순번 배정 계획(서버·미리보기 공용): 시간 초과로 비어 있는 순번이 있으면 가장 앞 번호를 다시 쓰고, 없으면 새 순번 */
-function planSlot(data, uid, now){
-  const N = CONFIG.conditions.length * CONFIG.templates.length;
-  const last = Number(data.n) || 0, slots = Object.assign({}, data.slots || {}), who = Object.assign({}, data.who || {});
+/* 본실험 배정 계획(서버·미리보기 공용). a = meta/alloc 문서 {total, n, slots: {seq: {t 배정 시각(서버), d 완료, r 재발급 횟수, u uid}}, who: {uid: seq}}
+   - 이미 seq를 받은 사람(who에 있음)은 항상 같은 seq (재접속·새로고침에도 새 seq를 주지 않음)
+   - 배정 후 slotTimeoutMin분 안에 끝나지 않은 seq가 있으면 가장 작은 번호를 같은 조건·템플릿으로 재발급 (noReuse면 건너뜀)
+   - 아니면 다음 seq(n + 1). 300행을 모두 썼으면 closed (배정표 밖의 임의 배정은 하지 않음) */
+const tsMs = v => v == null ? NaN : typeof v.toMillis === "function" ? v.toMillis() : typeof v.toDate === "function" ? v.toDate().getTime() : (v.__ts ?? Number(v));
+function allocPlan(a, uid, now, noReuse = false){
+  const total = Number(a.total) || 0, n = Number(a.n) || 0, slots = a.slots || {}, who = a.who || {};
+  if (Object.prototype.hasOwnProperty.call(who, uid)) { const k = Number(who[uid]), sl = slots[k] || {}; return { k, n, r: Number(sl.r) || 0, prev: "", existing: true }; }
   const limit = CONFIG.slotTimeoutMin * 60000;
-  const free = Object.keys(slots).map(Number).filter(k => Number.isInteger(k) && k >= 1).sort((a, b) => a - b)
-    .find(k => { const s = slots[k] || {}; return !s.d && now - Number(s.t || 0) > limit; });
-  let k, n = last, r = 0;
-  if (free !== undefined) { k = free; r = (Number(slots[free].r) || 0) + 1; } else { k = last + 1; n = k; }
-  const cell = (k - 1) % N;
-  slots[k] = { t: now, d: false, r, u: uid };
-  who[uid] = k;
-  return { assignDoc: { n, slots, who }, session: { slot: k, cell, condition: CONFIG.conditions[cell % 3], template: CONFIG.templates[Math.floor(cell / 3)], assign_reused: r } };
+  const free = noReuse ? undefined : Object.keys(slots).map(Number).filter(k => Number.isInteger(k) && k >= 1 && k <= n).sort((x, y) => x - y)
+    .find(k => { const sl = slots[k] || {}; return !sl.d && now - tsMs(sl.t) > limit; });
+  if (free !== undefined) return { k: free, n, r: (Number(slots[free].r) || 0) + 1, prev: slots[free].u || "", existing: false };
+  if (n < total) return { k: n + 1, n: n + 1, r: 0, prev: "", existing: false };
+  return { closed: true };
+}
+/* 배정 시점에 함께 저장하는 기기 정보 */
+function deviceInfo(){
+  const o = (screen.orientation && screen.orientation.type) || (window.innerWidth > window.innerHeight ? "landscape" : "portrait");
+  return { device: S.device, os_name: OS_NAME, browser: BROWSER, screen_w: Math.round(screen.width) || 0, screen_h: Math.round(screen.height) || 0, orientation: String(o).split("-")[0] };
 }
 
 /* 미리보기(및 연구자 내부 점검)용 가짜 서버: 보안 규칙과 같은 순서·공개 범위를 흉내 냄 */
 function makeMockBackend(){
   const KEY = "droneExp_v7_mock";
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || "null") || {}; } catch (e) { return {}; } };
-  const st = Object.assign({ assign: {}, sessions: {}, trials: {}, uid: null }, load());
+  const st = Object.assign({ alloc: null, sessions: {}, trials: {}, uid: null, log: [] }, load());
+  // 미리보기용 배정표(실제 02 배정표가 아님): 조건 early·late·control과 6템플릿을 차례로 돌림
+  if (!st.alloc) st.alloc = { total: CONFIG.alloc.total, n: 0, slots: {}, who: {} };
+  const mockRow = k => ({ condition: CONFIG.conditions[(k - 1) % 3], template: CONFIG.templates[Math.floor((k - 1) / 3) % 6] });
   const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} };
   const deny = m => Object.assign(new Error(m), { code: "permission-denied" });
   const rowOf = (tpl, t) => MOCK_STIM.find(r => r.template === tpl && r.trial === Number(t.slice(1)));
@@ -809,14 +844,19 @@ function makeMockBackend(){
     async init(){ if (!st.uid) { st.uid = "mock-" + Math.random().toString(36).slice(2, 10); persist(); } api.uid = st.uid; return api.uid; },
     async stimulusSha(){ return CONFIG.stimulusSha256; },
     async getSession(){ await net(); return st.sessions[api.uid] || null; },
+    async allocInfo(){ await net(); return JSON.parse(JSON.stringify(st.alloc)); },
+    async markVisit(){},
     async assign(base){
       await net();
       if (st.sessions[api.uid]) return st.sessions[api.uid];
-      const plan = planSlot(st.assign, api.uid, Date.now());
-      const forced = params.get("cell");   // 미리보기에서만: ?cell=0~17 로 칸 지정
-      if (forced !== null && /^\d+$/.test(forced) && Number(forced) < 18) { const c = Number(forced);
-        Object.assign(plan.session, { cell: c, condition: CONFIG.conditions[c % 3], template: CONFIG.templates[Math.floor(c / 3)] }); }
-      st.assign = plan.assignDoc; st.sessions[api.uid] = Object.assign({}, base, plan.session, { created_at: isoLocal() }); st.trials[api.uid] = {};
+      const p = allocPlan(st.alloc, api.uid, Date.now());
+      if (p.closed) throw Object.assign(new Error("closed"), { code: "closed" });
+      if (!p.existing) { st.alloc.n = p.n; st.alloc.slots[p.k] = { t: Date.now(), d: false, r: p.r, u: api.uid }; st.alloc.who[api.uid] = p.k; }
+      const row = mockRow(p.k);
+      const forced = params.get("cell");   // 미리보기에서만: ?cell=0~17 로 조건·템플릿 지정
+      if (forced !== null && /^\d+$/.test(forced) && Number(forced) < 18) { const c = Number(forced); row.condition = CONFIG.conditions[c % 3]; row.template = CONFIG.templates[Math.floor(c / 3)]; }
+      st.sessions[api.uid] = Object.assign({}, base, deviceInfo(), { seq: p.k, alloc: CONFIG.alloc.version, condition: row.condition, template: row.template, assign_reused: p.r, created_at: isoLocal() });
+      st.trials[api.uid] = {}; st.log.push({ type: p.r ? "reissue" : "assign", seq: p.k, r: p.r, uid: api.uid, prev_uid: p.prev || "" });
       persist(); return st.sessions[api.uid];
     },
     async setT0(v){ await net(); const s = st.sessions[api.uid]; if (!s || "T0" in s) throw deny("t0"); Object.assign(s, v); persist(); },
@@ -842,7 +882,7 @@ function makeMockBackend(){
         const prev = t === "t01" ? 0 : st.trials[api.uid][prevT(t)].cum;
         if (v.D !== D || v.C !== C || v.time_C !== time || v.cum !== prev + time) throw deny("C_check"); }
       Object.assign(x, v); persist(); },
-    async finish(rec){ await net(); st.sessions[api.uid].finished = true; persist(); window.__mockFinished = rec; },
+    async finish(rec){ await net(); st.sessions[api.uid].finished = true; const sl = rec.seq != null && st.alloc.slots[rec.seq]; if (sl && sl.u === api.uid) sl.d = true; persist(); window.__mockFinished = rec; },
   };
   return api;
 }
@@ -1089,7 +1129,7 @@ const S = {
 const EV_COLS = ["pid","uid","slot","condition","template","device","event_index","timestamp","t_ms","phase","event_type","trial","item_id","step","value","rt_ms","net_ms","note"];
 function log(event_type, f = {}){
   S.eventIndex++;
-  S.events.push(Object.assign({ pid: S.pid, uid: S.uid || "", slot: S.session ? S.session.slot : "", condition: S.session ? S.session.condition : "",
+  S.events.push(Object.assign({ pid: S.pid, uid: S.uid || "", slot: S.session ? (S.session.seq ?? S.session.slot) : "", condition: S.session ? S.session.condition : "",
     template: S.session ? S.session.template : "", device: S.device, event_index: S.eventIndex, timestamp: isoLocal(),
     t_ms: (performance.now() - S.startT).toFixed(1), phase: S.phase, event_type }, f));
   persistLocal();
@@ -1099,12 +1139,12 @@ const LKEY = () => "droneExp_v7_state_" + S.uid;
 function persistLocal(){
   if (!S.uid) return;
   try { localStorage.setItem(LKEY(), JSON.stringify({ pid: S.pid, info: S.info, survey: S.survey, comp: S.comp, events: S.events.slice(-600), eventIndex: S.eventIndex,
-    preDone: S.preDone, postIdx: S.postIdx, postDone: S.postDone, finishId: S.finishId, notes: S.notes })); } catch (e) {}
+    preDone: S.preDone, postIdx: S.postIdx, postDone: S.postDone, finishId: S.finishId, notes: S.notes, allocPrev: S.allocPrev || null })); } catch (e) {}
 }
 function restoreLocal(){
   try { const x = JSON.parse(localStorage.getItem(LKEY()) || "null"); if (!x) return false;
     Object.assign(S, { pid: x.pid || "", info: x.info || {}, survey: x.survey || {}, comp: x.comp || S.comp, events: x.events || [], eventIndex: x.eventIndex || 0,
-      preDone: !!x.preDone, postIdx: x.postIdx || 0, postDone: !!x.postDone, finishId: x.finishId || null, notes: x.notes || [] }); return true;
+      preDone: !!x.preDone, postIdx: x.postIdx || 0, postDone: !!x.postDone, finishId: x.finishId || null, notes: x.notes || [], allocPrev: x.allocPrev || null }); return true;
   } catch (e) { return false; }
 }
 function show(id){
@@ -1202,6 +1242,7 @@ if (INAPP) {
 let HIDDEN_N = 0;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === "hidden") HIDDEN_N++; try { log("visibility", { value: document.visibilityState }); } catch (e) {} });
 function block(title, text){ $('blocked-title').textContent = title; $('blocked-text').textContent = text; show('s-blocked'); }
+function showClosed(){ log("page", { note: "closed" }); S.leaveOK = true; GUARD = false; block("모집이 마감되었습니다", `준비한 참여 인원이 모두 찼습니다. 관심을 가져 주셔서 감사합니다. 문의: ${CONFIG.consent.contact}`); }
 
 $('b-start').onclick = async () => {
   const b = $('b-start'); b.disabled = true; b.textContent = "준비 중…"; $('start-err').textContent = "";
@@ -1218,6 +1259,12 @@ $('b-start').onclick = async () => {
       log("page", { note: "resume_found" }); show('s-resume'); return;
     }
     if (CONFIG.paused && !PREVIEW) { block("지금은 실험 참여를 잠시 멈춘 상태입니다", `연구자가 실험 참여를 잠시 중단했습니다. 다시 열리면 같은 주소로 참여하실 수 있습니다. 문의: ${CONFIG.consent.contact}`); return; }
+    // 본실험 배정표 확인: 아직 올라오지 않았거나(준비 중) 300행을 모두 썼으면(모집 마감) 시작 전에 안내 — 배정표 밖의 임의 배정은 하지 않음
+    let alloc = null;
+    try { alloc = await net("alloc", () => BE.allocInfo(), { fatal: c => c === "permission-denied" }); } catch (e) { alloc = null; }   // 새 보안 규칙 게시 전에도 오류 반복 대신 '준비 중' 안내
+    if (!alloc || !(Number(alloc.total) > 0)) { block("지금은 실험을 시작할 수 없습니다", `실험 배정 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (문의: ${CONFIG.consent.contact})`); return; }
+    if (allocPlan(alloc, S.uid, Date.now()).closed) { showClosed(); return; }
+    BE.markVisit();
     setPhase("consent"); show('s-consent');
   } finally { if (!BAD_ORIGIN) { b.disabled = false; b.textContent = "시작하기"; } }
 };
@@ -1434,7 +1481,7 @@ function renderComp(isRetry){
     S.comp.attempts++; S.comp.results.push(correct);
     COMPREHENSION.forEach(q => { S.survey[q.id + "_try" + S.comp.attempts] = ans[q.id]; log("comprehension", { item_id: q.id, step: "try" + S.comp.attempts, value: ans[q.id], note: ans[q.id] === q.correct ? "correct" : "wrong" }); });
     log("comprehension", { step: "score", value: correct, rt_ms: (performance.now() - t0).toFixed(0) });
-    if (correct === COMPREHENSION.length) { S.comp.passed = true; persistLocal(); return assignAndContinue(); }
+    if (correct === COMPREHENSION.length) { S.comp.passed = true; persistLocal(); return showProcedure(); }
     if (S.comp.attempts < CONFIG.comprehensionMaxAttempts) { persistLocal(); return renderComp(true); }
     S.comp.reviewed = true; persistLocal(); showCompReview(ans);
   };
@@ -1468,21 +1515,26 @@ function showCompReview(ans){
   $('c-review').onchange = e => $('b-review').disabled = !e.target.checked;
   $('b-review').onclick = () => {
     log("comprehension", { step: "review", value: "acknowledged", rt_ms: (performance.now() - t0).toFixed(0) });
-    persistLocal(); assignAndContinue();
+    persistLocal(); showProcedure();
   };
 }
 
 /* =====================================================================
-   6. 조건·템플릿 배정 (서버 순번, 한 번 정하면 유지: I03)
+   6. 조건·템플릿 배정: 시작 전 신뢰(T0) 응답 직후, 1회차 직전에 본실험 배정표(서버)의 다음 seq를 받음.
+      그 전 단계에서 그만둔 사람은 seq를 쓰지 않음. 한 번 받은 seq는 재접속해도 유지(I03).
    ===================================================================== */
-async function assignAndContinue(){
+async function assignWithT0(rec){
   setPhase("assign");
-  await decideGL();   // 화면 방식(3d/2d)을 배정 기록에 남기기 위해 (연습에서 이미 정해졌으면 바로 진행)
-  const base = { pid: S.pid, app_version: CONFIG.appVersion, device: S.device, stim_sha: CONFIG.stimulusSha256, comp_passed: S.comp.passed ? 1 : 0, view: USE_GL() ? "3d" : "2d" };
-  const sess = await net("assign", () => BE.assign(base), { timeout: 25000 });
-  S.session = sess;
-  log("page", { note: `assigned:slot=${sess.slot};reused=${sess.assign_reused}` });
-  showProcedure();
+  await decideGL();
+  const base = Object.assign({ pid: S.pid, app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256, comp_passed: S.comp.passed ? 1 : 0, view: USE_GL() ? "3d" : "2d" }, rec);
+  try { S.session = await net("assign", () => BE.assign(base), { timeout: 25000, fatal: c => c === "closed" || c === "alloc_missing" || c === "alloc_row_missing" }); }
+  catch (e) {
+    const c = e && e.code;
+    if (c === "closed") { showClosed(); return false; }
+    block("지금은 실험을 계속할 수 없습니다", `실험 배정 자료를 찾지 못했습니다. 이 화면을 캡처해 실험자에게 알려 주세요. (문의: ${CONFIG.consent.contact}, ${c || "alloc"})`); return false;
+  }
+  log("page", { note: `assigned:seq=${S.session.seq};reissue=${S.session.assign_reused}` });
+  return true;
 }
 
 /* =====================================================================
@@ -1510,9 +1562,11 @@ function showT0(){
     const v = sl.value(); if (v === null) return;
     $('b-t0').disabled = true;
     const rec = { T0: v, rt_T0: Math.round(performance.now() - t0), ts_T0: isoLocal() };
-    await net("T0", () => BE.setT0(rec), { recover: async () => { const s = await BE.getSession(); if (s && "T0" in s) return true; } });
-    Object.assign(S.session, rec);
     log("trust", { trial: 0, step: "T0", value: v, rt_ms: rec.rt_T0 });
+    if (S.session) {   // 예전 방식(파일럿)으로 이미 배정된 세션을 이어 하는 경우: T0만 저장
+      await net("T0", () => BE.setT0(rec), { recover: async () => { const s = await BE.getSession(); if (s && "T0" in s) return true; } });
+      Object.assign(S.session, rec);
+    } else if (!(await assignWithT0(rec))) return;   // 본실험: T0와 함께 배정(세션 생성)
     runMain(1);
   };
   show('s-trust0');
@@ -1668,7 +1722,7 @@ function trialRows(){
   return Array.from({ length: CONFIG.nTrials }, (_, i) => {
     const t = tid(i + 1), x = S.trials[t] || {}, c = S.cues[t] || {}, o = S.outcomes[t] || {};
     const fast = o.left_actual === undefined ? null : Math.min(o.left_actual, o.right_actual);
-    return Object.assign({ pid: S.pid, uid: S.uid, slot: s.slot, condition: s.condition, template: s.template, trial: i + 1 }, c, x,
+    return Object.assign({ pid: S.pid, uid: S.uid, slot: s.seq ?? s.slot, condition: s.condition, template: s.template, trial: i + 1 }, c, x,
       { left_delay: o.left_delay, right_delay: o.right_delay, left_actual: o.left_actual, right_actual: o.right_actual, Y: o.Y,
         H_correct: o.Y === undefined ? "" : Number(x.H === o.Y), D_correct: o.Y === undefined ? "" : Number(x.D === o.Y),
         C_correct: o.Y === undefined ? "" : Number(x.C === o.Y), R_real: fast === null || x.time_C === undefined ? "" : x.time_C - fast });
@@ -1696,8 +1750,8 @@ function buildSummary(rows){
   const aiIds = Array.from({ length: AI_N }, (_, k) => "ai_" + (k + 1));
   const ai = id => { const v = Number(sv[id]); return AI_REVERSE.includes(id) ? 6 - v : v; };
   const o = {
-    pid: S.pid, uid: S.uid, slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
-    device: S.device, os: OS, inapp: INAPP, screen: `${screen.width}x${screen.height}@${window.devicePixelRatio || 1}`, hidden_n: HIDDEN_N, gl_lost: GL_LOST ? 1 : 0,
+    pid: S.pid, uid: S.uid, seq: s.seq ?? "", alloc: s.alloc ?? "pilot", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
+    device: S.device, os: OS, os_name: s.os_name ?? OS_NAME, browser: s.browser ?? BROWSER, screen_w: s.screen_w ?? screen.width, screen_h: s.screen_h ?? screen.height, orientation: s.orientation ?? "", inapp: INAPP, screen: `${screen.width}x${screen.height}@${window.devicePixelRatio || 1}`, hidden_n: HIDDEN_N, gl_lost: GL_LOST ? 1 : 0,
     ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone,
     comp_attempts: S.comp.attempts, comp_score_1: S.comp.results[0] ?? "", comp_score_2: S.comp.results[1] ?? "", comp_passed: S.comp.passed ? 1 : 0, comp_reviewed: S.comp.reviewed ? 1 : 0,
     T0: s.T0 ?? "", trials_done: done.length,
@@ -1721,7 +1775,7 @@ function buildSummary(rows){
   });
   return o;
 }
-const SUM_COLS = ["pid","uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","edu","exp_drone",
+const SUM_COLS = ["pid","uid","seq","alloc","slot","cell","condition","template","assign_reused","device","os","os_name","browser","screen_w","screen_h","orientation","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","edu","exp_drone",
   "comp_attempts","comp_score_1","comp_score_2","comp_passed","comp_reviewed","T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final",
   "H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median","resumed_n",
   ...Array.from({ length: 20 }, (_, i) => "H_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "A_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "T_" + (i + 1)),
@@ -1744,10 +1798,10 @@ function baseRecord(condOverride){
     events: { name: S.finishId + "_events.csv", text: toCSV(S.events, EV_COLS) }
   };
   const s = S.session || {};
-  return { id: S.finishId, slot: s.slot ?? null, summary,
-    doc: { pid: S.pid, phone: clean(S.info.phone), uid: S.uid, slot: s.slot ?? 0, condition: condOverride || s.condition, template: s.template || "",
+  return { id: S.finishId, slot: s.slot ?? null, seq: s.seq ?? null, summary,
+    doc: Object.assign(s.seq != null ? { seq: s.seq, alloc: s.alloc } : {}, { pid: S.pid, phone: clean(S.info.phone), uid: S.uid, slot: s.seq ?? s.slot ?? 0, condition: condOverride || s.condition, template: s.template || "",
       app_version: CONFIG.appVersion, summary: sumClean, summary_cols: SUM_COLS, trials_cols: TR_COLS, trials_csv: FILES.trials.text,
-      events_cols: EV_COLS, events_csv: FILES.events.text } };
+      events_cols: EV_COLS, events_csv: FILES.events.text }) };
 }
 async function finish(){
   S.phase = "end"; log("page", { note: "end" });

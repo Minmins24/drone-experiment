@@ -93,12 +93,21 @@ td.na{color:#b0b6b1}
 
     <!-- 2. 배정 -->
     <section class="card">
-      <div class="row" style="justify-content:space-between">
-        <div><h2>2. 조건 × 템플릿 순차 배정 (18칸)</h2><p class="sub" id="seq-info">불러오는 중…</p></div>
-        <button class="btn danger" id="b-seq-reset">배정 순번 초기화</button>
+      <h2>2. 본실험 배정표 (v3 · 300행)</h2>
+      <p class="sub" id="alloc-state">확인 중…</p>
+      <div class="row" style="margin-top:10px">
+        <input type="file" id="f-alloc" accept=".csv,text/csv">
+        <button class="btn primary" id="b-alloc-up" disabled>검사 후 서버에 올리기</button>
       </div>
-      <p class="sub" style="margin-top:8px">순번 k → 칸 (k−1) % 18 → 조건(초기·후기·통제 반복) × 템플릿(B1N, B1M, B2N, B2M, B3N, B3M 순). 이해 확인을 마친 사람(2회 미통과 시 정답·해설 확인 후)만 순번을 받습니다. 시작 후 90분 안에 끝내지 못한 순번은 같은 칸으로 다음 참가자에게 먼저 다시 배정됩니다. <b>본 실험 링크를 보내기 직전에</b> 시험 자료를 지우고 순번을 초기화하세요.</p>
+      <p class="sub" style="margin-top:6px">02_앱업로드용_배정표_v3_1-300명.csv만 올릴 수 있습니다(SHA-256 <code>67ca9426…8e83</code>이 같아야 함). 조건 코드는 E→early, L→late, C→control로 바꿔 저장합니다. 이미 배정이 시작된 뒤에는 다시 올릴 수 없습니다.</p>
+      <div class="msg" id="alloc-msg" hidden></div>
+      <p class="sub" id="seq-info" style="margin-top:10px"></p>
+      <div class="row" style="margin-top:8px"><button class="btn" id="b-alloc-testreset" title="배정된 사람이 모두 시험 참가자(뒷자리 0000)일 때만 됩니다">시험 배정 되돌리기 (뒷자리 0000만)</button>
+        <span class="sub">qa.html 점검이나 직접 시험으로 쓴 seq를 지우고 본실험이 seq 1부터 시작되게 합니다. 실제 참가자가 한 명이라도 배정되면 누를 수 없습니다.</span></div>
+      <p class="sub" style="margin-top:6px"><b>배정 규칙</b>: 시작 전 신뢰(T0)에 답한 직후, 1회차 직전에 배정표의 다음 seq를 받습니다(그 전에 그만둔 사람은 seq를 쓰지 않음). 한 번 받은 seq는 다시 접속해도 유지됩니다. <b>재발급</b>: 배정 후 90분 안에 끝내지 못한 seq는(1회차 이후 이탈 포함) 다음 참가자가 배정을 받을 때 가장 작은 번호부터 같은 조건·템플릿으로 다시 발급합니다. 원래 배정자가 다시 접속하면 원래 배정으로 이어서 진행합니다. 300행을 모두 쓰면 새 참가자에게 '모집 마감'을 보여 줍니다.</p>
       <div class="tbl-wrap"><table id="bal"></table></div>
+      <h3 style="margin-top:14px">재발급 기록</h3>
+      <div class="tbl-wrap"><table id="alloc-log"></table></div>
     </section>
 
     <!-- 3. 자료 -->
@@ -107,6 +116,8 @@ td.na{color:#b0b6b1}
       <div class="stats" id="stats"></div>
       <div class="row" style="margin-top:12px;justify-content:space-between">
         <div class="row">
+          <label class="sub" for="f-phase">구분</label>
+          <select id="f-phase"><option value="main">본실험(v3 배정표)</option><option value="pilot">파일럿(이전 방식)</option><option value="">전체</option></select>
           <label class="sub" for="f-cond">조건</label>
           <select id="f-cond"><option value="">전체</option><option value="early">초기 오류</option><option value="late">후기 오류</option><option value="control">무오류 통제</option></select>
           <label class="sub" for="f-ver">버전</label><select id="f-ver"><option value="">전체</option></select>
@@ -122,6 +133,7 @@ td.na{color:#b0b6b1}
         <button class="btn" id="b-dl-sess">세션 목록 CSV</button>
         <button class="btn" id="b-dl-sum">summary CSV</button>
         <button class="btn" id="b-dl-ev">events CSV</button>
+        <button class="btn" id="b-dl-alog" title="본실험 배정·재발급 기록 전체(필터와 무관)">배정·재발급 기록 CSV</button>
         <button class="btn danger" id="b-del-vis">보이는 기록 모두 삭제</button>
       </div>
       <p class="sub" style="margin-top:8px"><b>전체(total) CSV</b>는 참가자 1명 × 20회차를 한 줄씩(1명 = 20줄) 담고, 각 줄에 그 참가자의 모든 정보(참가자 정보·배정·기기, 사전 척도 문항별 점수와 평균, 이해 확인, 연습 선택, 과제 요약, 사후 설문, 진행 기록 요약)를 함께 붙입니다. 회차 기록이 없는 참가자도 1줄로 들어갑니다. 지금 표에 보이는 참가자만 담기므로, 전체를 받으려면 필터를 ‘전체’로 두세요. <b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
@@ -129,7 +141,7 @@ td.na{color:#b0b6b1}
       <div class="tbl-wrap"><table>
         <thead>
           <tr class="grp"><th colspan="9">기본</th><th colspan="6">참가자</th><th colspan="4">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="4">사후</th><th></th></tr>
-          <tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th>순번</th><th>조건</th><th>템플릿</th><th>진행</th><th>상태</th><th>버전</th>
+          <tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th title="본실험: 배정표 seq / 파일럿: P+이전 순번">seq</th><th>조건</th><th>템플릿</th><th>진행</th><th>상태</th><th>버전</th>
           <th class="gs">나이</th><th>연령대</th><th>성별</th><th>최종 학력</th><th>드론 경험</th><th title="기기 · 화면 방식(3D/2D)">기기·화면</th>
           <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="AI 기술적 이해 14문항 평균(역채점 없음, 1~5점)">AI 이해</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th>
           <th class="gs" title="통과=1차 또는 2차에 4문항 모두 정답 / 해설 후 진행=2회 미통과">결과</th>
@@ -156,12 +168,14 @@ const FROZEN_SHA = "cfb1a097ab0e52aecc11f5a19760fd37832b87032ec30f9a367581aaf66c
 const CONDS = ["early", "late", "control"], CNAME = { early: "초기 오류", late: "후기 오류", control: "무오류 통제", none: "이해확인 미통과" };
 const TEMPLATES = ["V4-B1N", "V4-B1M", "V4-B2N", "V4-B2M", "V4-B3N", "V4-B3M"];
 const SLOT_TIMEOUT_MIN = 90;   // index.html CONFIG.slotTimeoutMin과 같게
+const ALLOC_SHA = "67ca9426d8326dbe6828c4e209b234196d74f8966a30ba31e221db5ee71e8e83", ALLOC_TOTAL = 300, ALLOC_VER = "v3";   // 02 배정표 확인값(index.html CONFIG.alloc과 같게)
+const ALLOC_CODE = { E: "early", L: "late", C: "control" };
 const COLS = ("template trial item_id left_base left_delay_pct left_penalty right_base right_delay_pct right_penalty EV_left EV_right EV_gap F F_wrong left_delay right_delay left_actual right_actual Y actual_gap D_early D_late D_control").split(" ");
 const PUBLIC = ["template","trial","item_id","left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty"];
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, setDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
@@ -340,29 +354,106 @@ async function loadAll(){
     SESS = ss.docs.map(d => ({ uid: d.id, ...d.data() }));
     $('area').hidden = false; $('rules-help').hidden = true;
     await Promise.all(SESS.map(async s => { const q = await getDocs(collection(db, "sessions", s.uid, "trials")); TRIALS[s.uid] = {}; q.forEach(d => TRIALS[s.uid][d.id] = d.data()); }));
-    loadStim(); await loadSeq(); render();
+    loadStim(); await loadAlloc(); render();
   } catch (e) {
     if (e.code === "permission-denied") { $('rules-help').hidden = false; }
     else { $('area').hidden = false; msg('data-msg', "err", `불러오지 못했습니다 (${e.code || e.message}).`); }
   } finally { $('b-reload').disabled = false; }
 }
-let ASSIGN = {};
-async function loadSeq(){
-  try {
-    const snap = await getDoc(doc(db, "meta", "assign")); ASSIGN = snap.exists() ? snap.data() : {};
-    const last = Number(ASSIGN.n) || 0, slots = ASSIGN.slots || {}, now = Date.now(), limit = SLOT_TIMEOUT_MIN * 60000;
-    const ks = Object.keys(slots).map(Number).filter(k => k >= 1).sort((a, b) => a - b);
-    const done = ks.filter(k => slots[k].d), running = ks.filter(k => !slots[k].d && now - Number(slots[k].t) <= limit), free = ks.filter(k => !slots[k].d && now - Number(slots[k].t) > limit);
-    const next = free.length ? free[0] : last + 1, cell = (next - 1) % 18;
-    $('seq-info').innerHTML = `만든 순번 ${last}개 · 완료 <b>${done.length}</b> · 진행 중 ${running.length} · 비어서 다시 배정될 순번 ${free.length}${free.length ? " (" + free.join(", ") + ")" : ""}<br>` +
-      `다음 참가자: <b>순번 ${next} → ${CNAME[CONDS[cell % 3]]} · ${TEMPLATES[Math.floor(cell / 3)]}</b>${free.length ? " (중도 이탈 자리 우선)" : ""}`;
-  } catch (e) { $('seq-info').textContent = `순번을 불러오지 못했습니다 (${e.code || e.message}).`; }
+/* ====================== 본실험 배정표 ====================== */
+let ALLOC = null, ALOG = [], VISITS = {};
+const tsMs = v => v == null ? NaN : typeof v.toMillis === "function" ? v.toMillis() : typeof v.toDate === "function" ? v.toDate().getTime() : (v.__ts ?? Number(v));
+const tsIso = v => { const m = tsMs(v); return Number.isFinite(m) ? new Date(m).toISOString() : ""; };
+const tsKo = v => { const m = tsMs(v); return Number.isFinite(m) ? new Date(m).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : ""; };
+function parseAlloc(text){
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim() !== "");
+  const head = lines[0].split(",").map(x => x.trim());
+  if (head.join(",") !== "seq,condition,template") throw new Error(`첫 줄이 seq,condition,template 이 아닙니다 (${head.join(",")})`);
+  const rows = lines.slice(1).map((l, i) => { const [a, c, t] = l.split(",").map(x => x.trim());
+    if (!/^\d+$/.test(a) || Number(a) !== i + 1) throw new Error(`${i + 2}번째 줄: seq가 ${i + 1}이어야 합니다 (${a})`);
+    if (!(c in ALLOC_CODE)) throw new Error(`${i + 2}번째 줄: condition은 E·L·C 중 하나여야 합니다 (${c})`);
+    if (!TEMPLATES.includes(t)) throw new Error(`${i + 2}번째 줄: template이 6개 중 하나가 아닙니다 (${t})`);
+    return { seq: i + 1, code: c, condition: ALLOC_CODE[c], template: t }; });
+  if (rows.length !== ALLOC_TOTAL) throw new Error(`행 수가 ${ALLOC_TOTAL}이 아닙니다 (${rows.length})`);
+  return rows;
 }
-$('b-seq-reset').onclick = async () => {
-  if (!confirm("배정 순번을 0으로 되돌립니다. 다음 참가자부터 순번 1(초기 오류 · V4-B1N)이 다시 시작됩니다. 본 실험 중에는 누르지 마세요. 계속할까요?")) return;
-  try { await deleteDoc(doc(db, "meta", "assign")); await loadSeq(); msg('data-msg', "ok", "배정 순번을 초기화했습니다."); }
-  catch (e) { msg('data-msg', "err", `초기화하지 못했습니다 (${e.code || e.message}).`); }
+let APEND = null;
+$('f-alloc').onchange = async e => {
+  const file = e.target.files[0]; APEND = null; $('b-alloc-up').disabled = true; if (!file) return;
+  const buf = await file.arrayBuffer(), sha = await sha256Hex(buf);
+  if (sha !== ALLOC_SHA) return msg('alloc-msg', "err", `SHA-256이 보고서의 배정표와 다릅니다. 올리지 않습니다.\n파일: ${sha}\n기준: ${ALLOC_SHA}`);
+  try { const rows = parseAlloc(new TextDecoder("utf-8").decode(buf)); APEND = { rows, sha, name: file.name };
+    const cnt = c => rows.filter(r => r.code === c).length;
+    msg('alloc-msg', "ok", `해시 일치, 형식 검사 통과 (${rows.length}행 · E ${cnt("E")} · L ${cnt("L")} · C ${cnt("C")}). '검사 후 서버에 올리기'를 누르세요.`); $('b-alloc-up').disabled = false; }
+  catch (err) { msg('alloc-msg', "err", "검사 실패: " + err.message); }
 };
+$('b-alloc-up').onclick = async () => {
+  if (!APEND) return;
+  const btn = $('b-alloc-up'); btn.disabled = true; btn.textContent = "올리는 중…";
+  try {
+    const cur = await getDoc(doc(db, "meta", "alloc"));
+    if (cur.exists() && (Number(cur.data().n) || 0) > 0) throw Object.assign(new Error("이미 배정이 시작되어 다시 올릴 수 없습니다"), { code: "started" });
+    let b = writeBatch(db), n = 0;
+    for (const r of APEND.rows) { b.set(doc(db, "alloc", String(r.seq)), { seq: r.seq, condition: r.condition, template: r.template, code: r.code }); n++; }
+    await b.commit();
+    // 300행이 모두 저장된 뒤에만 배정 상태 문서를 만듦(참가자 앱은 이 문서가 있어야 시작)
+    await setDoc(doc(db, "meta", "alloc"), { version: ALLOC_VER, total: ALLOC_TOTAL, sha: APEND.sha, file_name: APEND.name, uploaded_at: serverTimestamp(), uploaded_by: auth.currentUser.uid, n: 0, slots: {}, who: {} });
+    // 다시 읽어 대조
+    const back = await getDocs(collection(db, "alloc")); const m = {}; back.forEach(d => m[d.id] = d.data());
+    const bad = APEND.rows.filter(r => !m[r.seq] || m[r.seq].condition !== r.condition || m[r.seq].template !== r.template).length + (back.size !== ALLOC_TOTAL ? 1 : 0);
+    msg('alloc-msg', bad ? "err" : "ok", bad ? `서버 대조 불일치 ${bad}건. 다시 올려 보세요.` : `업로드 및 서버 대조 완료: 배정표 ${ALLOC_TOTAL}행 모두 일치, SHA-256 ${APEND.sha} 기록.`);
+    await loadAlloc(); render();
+  } catch (e) { msg('alloc-msg', "err", e.code === "started" ? `올리지 못했습니다: ${e.message}.` : `올리지 못했습니다 (${e.code || e.message}).`); }
+  finally { btn.textContent = "검사 후 서버에 올리기"; btn.disabled = !APEND; }
+};
+async function loadAlloc(){
+  try {
+    const [a, lg, vs] = await Promise.all([getDoc(doc(db, "meta", "alloc")), getDocs(collection(db, "alloc_log")), getDocs(collection(db, "visits"))]);
+    ALLOC = a.exists() ? a.data() : null; ALOG = lg.docs.map(d => ({ id: d.id, ...d.data() })); VISITS = {}; vs.forEach(d => VISITS[d.id] = d.data());
+    if (!ALLOC) { $('alloc-state').innerHTML = `<span class="flag">아직 올리지 않았습니다.</span> 배정표가 올라오기 전에는 참가자 앱이 시작되지 않습니다.`; $('seq-info').textContent = ""; return; }
+    $('alloc-state').innerHTML = (ALLOC.sha === ALLOC_SHA ? `서버 배정표: 기준 해시와 일치` : `<span class="flag">서버 배정표 확인값이 기준 해시와 다릅니다.</span>`) +
+      ` (${esc(ALLOC.file_name || "")}, ${ALLOC.total}행, ${esc(tsKo(ALLOC.uploaded_at))} 올림)`;
+    const n = Number(ALLOC.n) || 0, slots = ALLOC.slots || {}, now = Date.now(), limit = SLOT_TIMEOUT_MIN * 60000;
+    const ks = Object.keys(slots).map(Number).filter(k => k >= 1).sort((x, y) => x - y);
+    const done = ks.filter(k => slots[k].d), running = ks.filter(k => !slots[k].d && now - tsMs(slots[k].t) <= limit), free = ks.filter(k => !slots[k].d && now - tsMs(slots[k].t) > limit);
+    const re = ALOG.filter(x => x.type === "reissue").length;
+    $('seq-info').innerHTML = `사용한 seq <b>${n}</b> / ${ALLOC.total} · 완료 <b>${done.length}</b> · 진행 중 ${running.length} · 재발급 대기 ${free.length} · 지금까지 재발급 ${re}회` +
+      (n >= ALLOC.total && !free.length ? ` · <span class="flag">모집 마감(새 배정 없음)</span>` : "");
+  } catch (e) { $('alloc-state').textContent = `배정표 상태를 불러오지 못했습니다 (${e.code || e.message}).`; }
+}
+$('b-alloc-testreset').onclick = async () => {
+  if (!ALLOC) return msg('alloc-msg', "info", "배정표가 아직 없습니다.");
+  const who = ALLOC.who || {}, uids = Object.keys(who);
+  const mainS = SESS.filter(isMain), mainP = PARTS.filter(isMain);
+  const real = mainS.filter(s => !isTest(s.pid)).length + mainP.filter(p => !isTest(p.pid)).length + uids.filter(u => !mainS.some(s => s.uid === u)).length;
+  if (real) return msg('alloc-msg', "err", `실제 참가자(또는 세션이 없는 배정) ${real}건이 있어 되돌릴 수 없습니다.`);
+  if (!uids.length) return msg('alloc-msg', "info", "되돌릴 시험 배정이 없습니다.");
+  if (!confirm(`시험 배정 ${uids.length}건(뒷자리 0000)과 그 기록을 지우고, 본실험이 seq 1부터 시작되도록 되돌립니다. 계속할까요?`)) return;
+  try {
+    for (const s of mainS) { for (const t of Object.keys(TRIALS[s.uid] || {})) await deleteDoc(doc(db, "sessions", s.uid, "trials", t)); await deleteDoc(doc(db, "sessions", s.uid)); }
+    for (const p of mainP) await deleteDoc(doc(db, "participants", p.id));
+    for (const x of ALOG) await deleteDoc(doc(db, "alloc_log", x.id));
+    for (const u of uids) if (VISITS[u]) await deleteDoc(doc(db, "visits", u));
+    await setDoc(doc(db, "meta", "alloc"), Object.assign({}, ALLOC, { n: 0, slots: {}, who: {} }));
+    msg('alloc-msg', "ok", `시험 배정 ${uids.length}건을 되돌렸습니다. 다음 참가자가 seq 1을 받습니다.`); loadAll();
+  } catch (e) { msg('alloc-msg', "err", `되돌리지 못했습니다 (${e.code || e.message}).`); }
+};
+function renderAllocLog(){
+  const rows = ALOG.filter(x => x.type === "reissue").sort((a, b) => (a.seq - b.seq) || (a.r - b.r));
+  const stage = uid => { const s = SESS.find(x => x.uid === uid); if (!s) return "세션 없음";
+    const n = Object.values(TRIALS[uid] || {}).filter(x => "T" in x).length; return s.finished ? "완료" : (n ? `${n}회차까지` : "1회차 전"); };
+  const pidOf = uid => (SESS.find(x => x.uid === uid) || {}).pid || "";
+  $('alloc-log').innerHTML = `<tr><th>seq</th><th>재발급 차수</th><th>시각</th><th>원래 배정자(뒷자리 · uid)</th><th>원래 배정자 마지막 진행</th><th>새 배정자(뒷자리 · uid)</th><th>사유</th></tr>` +
+    (rows.map(x => `<tr><td class="num">${esc(x.seq)}</td><td class="num">${esc(x.r)}</td><td>${esc(tsKo(x.ts))}</td><td>${esc(pidOf(x.prev_uid))} · <span class="sub">${esc(String(x.prev_uid).slice(0, 10))}</span></td>
+      <td>${esc(stage(x.prev_uid))}</td><td>${esc(pidOf(x.uid))} · <span class="sub">${esc(String(x.uid).slice(0, 10))}</span></td><td>${esc(x.reason === `timeout_${SLOT_TIMEOUT_MIN}min_unfinished` ? `배정 후 ${SLOT_TIMEOUT_MIN}분 안에 미완료` : x.reason)}</td></tr>`).join("")
+    || `<tr><td colspan="7" class="sub">재발급 기록이 없습니다.</td></tr>`);
+}
+function allocLogCsv(){
+  const cols = ["seq","r","type","ts","uid","pid","prev_uid","prev_pid","prev_last_stage","reason","app_version"];
+  const stage = uid => { const s = SESS.find(x => x.uid === uid); if (!s) return "no_session"; const n = Object.values(TRIALS[uid] || {}).filter(x => "T" in x).length; return s.finished ? "finished" : (n ? `trial_${n}` : "before_trial_1"); };
+  return [cols, ALOG.slice().sort((a, b) => (a.seq - b.seq) || (a.r - b.r)).map(x => ({ seq: x.seq, r: x.r, type: x.type, ts: tsIso(x.ts), uid: x.uid, pid: (SESS.find(s => s.uid === x.uid) || {}).pid || "",
+    prev_uid: x.prev_uid, prev_pid: (SESS.find(s => s.uid === x.prev_uid) || {}).pid || "", prev_last_stage: x.prev_uid ? stage(x.prev_uid) : "", reason: x.reason, app_version: x.app_version }))];
+}
 
 const isTest = pid => String(pid) === "0000";
 function sessStatus(s){
@@ -371,22 +462,27 @@ function sessStatus(s){
   return { n, status: s.finished ? "완료" : (age > SLOT_TIMEOUT_MIN * 60000 ? "중도 이탈" : "진행 중") };
 }
 function partOf(s){ return PARTS.find(p => p.uid === s.uid); }
+const isMain = r => r.alloc === ALLOC_VER;
+const phaseOk = r => { const f = $('f-phase').value; return f === "" || (f === "main" ? isMain(r) : !isMain(r)); };
 function visibleSess(){
   const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, ""), withTest = $('f-test').checked;
-  return SESS.filter(s => (withTest || !isTest(s.pid)) && (c === "" || s.condition === c) && (v === "" || s.app_version === v) &&
+  return SESS.filter(s => phaseOk(s) && (withTest || !isTest(s.pid)) && (c === "" || s.condition === c) && (v === "" || s.app_version === v) &&
     (!q || String(s.pid).includes(q) || String((partOf(s) || {}).phone || "").replace(/\D/g, "").includes(q)))
-    .sort((a, b) => (Number(b.slot) || 0) - (Number(a.slot) || 0));
+    .sort((a, b) => (isMain(b) - isMain(a)) || ((Number(b.seq ?? b.slot) || 0) - (Number(a.seq ?? a.slot) || 0)));
 }
 function visibleParts(){
   const c = $('f-cond').value, v = $('f-ver').value, q = $('f-q').value.replace(/\D/g, ""), withTest = $('f-test').checked;
-  return PARTS.filter(p => (withTest || !isTest(p.pid)) && (c === "" || p.condition === c) && (v === "" || p.app_version === v) &&
+  return PARTS.filter(p => phaseOk(p) && (withTest || !isTest(p.pid)) && (c === "" || p.condition === c) && (v === "" || p.app_version === v) &&
     (!q || String(p.pid).includes(q) || String(p.phone || "").replace(/\D/g, "").includes(q)));
 }
 function render(){
   const sel = $('f-ver'), cur = sel.value;
   const vers = [...new Set([...SESS, ...PARTS].map(r => String(r.app_version || "")))].filter(Boolean).sort().reverse();
   sel.innerHTML = `<option value="">전체</option>` + vers.map(v => `<option>${esc(v)}</option>`).join(""); sel.value = vers.includes(cur) ? cur : "";
-  const real = SESS.filter(s => !isTest(s.pid));
+  const real = SESS.filter(s => !isTest(s.pid) && phaseOk(s));
+  const ph = $('f-phase'); const nm = SESS.filter(s => isMain(s) && !isTest(s.pid)).length, np = SESS.filter(s => !isMain(s) && !isTest(s.pid)).length;
+  ph.options[0].textContent = `본실험(v3 배정표) ${nm}`; ph.options[1].textContent = `파일럿(이전 방식) ${np}`;
+  renderAllocLog();
   const st = real.map(s => ({ s, ...sessStatus(s) }));
   // 균형표: 조건 × 템플릿 (완료 / 진행 중 / 중도 이탈)
   $('bal').innerHTML = `<tr><th>조건 \\ 템플릿</th>${TEMPLATES.map(t => `<th>${t}</th>`).join("")}<th>합계 완료</th></tr>` +
@@ -399,7 +495,7 @@ function render(){
       CONDS.map(c => `${CNAME[c]} ${real.filter(s => s.condition === c && Number(s.comp_passed) === 0).length}명`).join(" · ") + `</td></tr>`;
   const phones = {}; PARTS.forEach(p => { if (p.phone && !isTest(p.pid)) phones[p.phone] = (phones[p.phone] || 0) + 1; });
   $('stats').innerHTML = [
-    [real.length, "배정된 세션(시험 제외)"], [st.filter(x => x.status === "완료").length, "완료"], [st.filter(x => x.status === "진행 중").length, "진행 중"],
+    [real.length, $('f-phase').value === "main" ? "본실험 배정(시험 제외)" : "배정된 세션(시험 제외)"], [st.filter(x => x.status === "완료").length, "완료"], [st.filter(x => x.status === "진행 중").length, "진행 중"],
     [st.filter(x => x.status === "중도 이탈").length, "중도 이탈"], [Object.values(phones).filter(x => x > 1).length, "중복 의심 전화번호"]
   ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
   $('tbody').innerHTML = visibleSess().map(s => {
@@ -410,9 +506,9 @@ function render(){
     const td = (v, cls = "num") => `<td class="${cls}${v === "" || v === undefined || v === null ? " na" : ""}">${v === "" || v === undefined || v === null ? "–" : esc(v)}</td>`;
     const comp = s.comp_passed === undefined ? "" : (Number(s.comp_passed) === 1 ? "통과" : "해설 후 진행");
     return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
-      <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${esc(s.slot)}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
+      <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${isMain(s) ? esc(s.seq) : `<span class="sub">P${esc(s.slot)}</span>`}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
       <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td><td>${esc(s.app_version)}</td>
-      ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.view].filter(Boolean).join(" · "), "")}
+      ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.os_name, s.view].filter(Boolean).join(" · "), "")}
       ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}
       ${td(comp, "gs")}
       ${td(s.T0, "num gs")}${td(aRate)}${td(tMean)}${td(last.T)}${td(hc)}${td(cc)}${td(cum)}
@@ -431,7 +527,7 @@ const LBL = {
   mc_error_noticed: { yes: "있었다", no: "없었다", unsure: "잘 모르겠다" }
 };
 const ITEM = {   // 문항 짧은 이름(전체 문구는 실험앱 화면 기준)
-  ptt_1: "신뢰하는 쪽을 더 선호", ptt_2: "R 불확실성 감당 못해 거의 불신", ptt_3: "자동화 시스템은 유능", ptt_4: "R 능력에 경계심", ptt_5: "R 돕고 지원하리라 기대 안 함", ptt_6: "하겠다고 한 일 수행 믿음",
+  ptt_1: "신뢰하는 쪽을 더 선호", ptt_2: "R 불확실성 감당 못해 좀처럼 불신", ptt_3: "자동화 시스템은 유능", ptt_4: "R 능력에 경계심", ptt_5: "R 돕고 지원할 마음 기대 안 함", ptt_6: "하겠다고 한 일 수행 믿음",
   ai_1: "세상을 더 낫게", ai_2: "R 강한 거부감", ai_3: "AI 기술 사용해 보고 싶음", ai_4: "R 단점이 더 많음", ai_5: "발전 기대", ai_6: "문제 해결책 제시", ai_7: "R AI 없는 기술 선호", ai_8: "R 두려움", ai_9: "AI 적용 기술 선택", ai_10: "R 새 문제 발생", ai_11: "대체로 긍정적 감정", ai_12: "R 가급적 사용 안 함"
 };
 const TIA_ITEM = ["R 속이려는 것 같다", "R 정직하지 못한 방식", "R 작동·결과 의심", "R 경계하게 됨", "R 해롭거나 위험", "확신을 가짐", "보안성 제공", "정직하다", "믿고 맡길 수 있다", "신뢰할 수 있다", "나는 신뢰할 수 있다"];
@@ -494,7 +590,7 @@ function save(name, cols, rows){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 function stampNow(){ const d = new Date(), p = x => String(x).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
-const TL_COLS = ["uid","pid","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0","trial","item_id",
+const TL_COLS = ["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0","trial","item_id",
   "left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty",
   "H","rt_H","rt_H_first","A","rt_A","rt_A_first","D","D_schedule_error","left_delay","right_delay","left_actual","right_actual","Y",
   "C","time_C","cum","T","rt_T","T_prev","F","F_wrong","EV_left","EV_right","H_correct","D_correct","C_correct","H_eq_F","H_eq_D",
@@ -509,7 +605,7 @@ function trialRowsFor(s){
         const expC = x.A === undefined ? undefined : (x.A === 0 ? x.H : o.D), expTime = expC === 0 ? o.left_actual : o.right_actual;
         const integrity = !has ? "incomplete" : (x.D === o.D && x.C === expC && x.time_C === expTime ? "ok" : "MISMATCH");
         const prevT = k === 1 ? s.T0 : (tr[tid(k - 1)] || {}).T;
-        rows.push(Object.assign({ uid: s.uid, pid: s.pid, slot: s.slot, cell: s.cell, condition: s.condition, template: s.template, app_version: s.app_version, view: s.view ?? "",
+        rows.push(Object.assign({ uid: s.uid, pid: s.pid, phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition, template: s.template, app_version: s.app_version, view: s.view ?? "",
           comp_passed: s.comp_passed ?? "", session_status: status, trials_done: n, T0: s.T0 }, cu, x, {
           D: has ? x.D : "", D_schedule_error: o.D === undefined ? "" : Number(o.D !== o.Y),
           left_delay: has ? o.left_delay : "", right_delay: has ? o.right_delay : "", left_actual: has ? o.left_actual : "", right_actual: has ? o.right_actual : "", Y: has ? o.Y : "",
@@ -537,9 +633,9 @@ $('b-dl-trials').onclick = async () => {
   finally { btn.disabled = false; btn.textContent = "회차 자료(trials_long) CSV"; }
 };
 $('b-dl-sess').onclick = () => {
-  const cols = ["uid","pid","phone","slot","cell","condition","template","app_version","device","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
+  const cols = ["uid","pid","phone","phase","seq","alloc","slot","cell","condition","template","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
   save(`sessions_${stampNow()}.csv`, cols, visibleSess().map(s => { const { n, status } = sessStatus(s);
-    return { ...s, phone: (partOf(s) || {}).phone || "", created_at: s.created_at && s.created_at.toDate ? s.created_at.toDate().toISOString() : "", trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
+    return { ...s, phase: isMain(s) ? "main" : "pilot", phone: (partOf(s) || {}).phone || "", created_at: tsIso(s.created_at), trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
 };
 $('b-dl-sum').onclick = () => {
   const rows = visibleParts(); if (!rows.length) return;
@@ -555,8 +651,9 @@ $('b-dl-ev').onclick = () => {
   const a = document.createElement('a'); a.href = url; a.download = `events_all_${stampNow()}.csv`; document.body.appendChild(a); a.click(); a.remove();
 };
 /* ====================== 전체(total) CSV ====================== */
-const SESS_COLS = ["uid","pid","phone","slot","cell","condition","template","assign_reused","app_version","device","view","comp_passed","stim_sha","created_at","session_status","trials_done","finished","T0","rt_T0","ts_T0"];
-const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0"].includes(c));
+const SESS_COLS = ["uid","pid","phone","phase","seq","alloc","slot","cell","condition","template","assign_reused","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","stim_sha",
+  "visit_ts_server","created_at","finished_ts_server","dur_server_s","assign_to_finish_s","session_status","trials_done","finished","T0","rt_T0","ts_T0"];
+const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0"].includes(c));
 function parseEvents(csv){
   const lines = String(csv || "").replace(/^﻿/, "").split("\r\n").filter(Boolean); if (lines.length < 2) return [];
   const split = l => { const out = []; let cur = "", q = false; for (let i = 0; i < l.length; i++) { const ch = l[i];
@@ -582,9 +679,14 @@ function eventSummary(p){
 }
 function totalRows(){
   const rows = [], usedParts = new Set();
-  const sesRec = s => { const { n, status } = sessStatus(s); return { uid: s.uid, pid: s.pid, phone: (partOf(s) || {}).phone || "", slot: s.slot, cell: s.cell, condition: s.condition, template: s.template,
-    assign_reused: s.assign_reused, app_version: s.app_version, device: s.device, view: s.view ?? "", comp_passed: s.comp_passed ?? "", stim_sha: s.stim_sha ?? "",
-    created_at: s.created_at && s.created_at.toDate ? s.created_at.toDate().toISOString() : "", session_status: status, trials_done: n, finished: s.finished ? 1 : 0,
+  const sesRec = s => { const { n, status } = sessStatus(s), p = partOf(s) || {}, v = VISITS[s.uid] || {};
+    const vt = tsMs(v.ts), at = tsMs(s.created_at), ft = tsMs(p.created_at);
+    return { uid: s.uid, pid: s.pid, phone: p.phone || "", phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", alloc: s.alloc ?? "", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition, template: s.template,
+    assign_reused: s.assign_reused, app_version: s.app_version, device: s.device, os_name: s.os_name ?? "", browser: s.browser ?? "", screen_w: s.screen_w ?? "", screen_h: s.screen_h ?? "", orientation: s.orientation ?? "",
+    view: s.view ?? "", comp_passed: s.comp_passed ?? "", stim_sha: s.stim_sha ?? "",
+    visit_ts_server: tsIso(v.ts), created_at: tsIso(s.created_at), finished_ts_server: tsIso(p.created_at),
+    dur_server_s: Number.isFinite(vt) && Number.isFinite(ft) ? Math.round((ft - vt) / 1000) : "", assign_to_finish_s: Number.isFinite(at) && Number.isFinite(ft) ? Math.round((ft - at) / 1000) : "",
+    session_status: status, trials_done: n, finished: s.finished ? 1 : 0,
     T0: s.T0 ?? "", rt_T0: s.rt_T0 ?? "", ts_T0: s.ts_T0 ?? "" }; };
   const partRec = p => { const sm = Object.assign({}, p.summary || {}); Object.keys(sm).forEach(k => { if (/^(H|A|T)_\d+$/.test(k)) delete sm[k]; });   // 회차별 값은 각 줄의 회차 열에 있음
     return Object.assign({ participant_doc: p.id || "", has_summary: p.summary ? 1 : 0 }, sm, eventSummary(p)); };
@@ -621,9 +723,11 @@ $('b-dl-total').onclick = async () => {
 /* 열 설명(코드북) */
 const CB = Object.assign({}, {
   participant_doc: "결과 문서 ID(끝까지 마친 참가자)", has_summary: "설문·요약 있음(1)=끝까지 마침", uid: "참가자 고유 ID(파일 간 연결 열)", pid: "휴대전화 뒷자리", phone: "전화번호",
-  slot: "배정 순번", cell: "18칸 중 위치(0~17)", condition: "조건: early=초기 오류(2·4·7·9회), late=후기 오류(12·14·17·19회), control=무오류", template: "단서 템플릿", assign_reused: "중도 이탈 자리 재배정(1)",
+  phase: "main=본실험(v3 배정표), pilot=파일럿(이전 18칸 순차 배정)", seq: "본실험 배정표 순번(1~300)", alloc: "배정표 버전(v3)", slot: "배정 순번(본실험은 seq와 같음, 파일럿은 이전 순번)", cell: "파일럿 18칸 중 위치(0~17)",
+  os_name: "운영체제(windows/macos/ios/android/chromeos/linux)", browser: "브라우저", screen_w: "화면 폭(px)", screen_h: "화면 높이(px)", orientation: "배정 시 화면 방향(portrait/landscape)",
+  visit_ts_server: "첫 방문 시각(서버, UTC)", finished_ts_server: "결과 저장 시각(서버, UTC)", dur_server_s: "총 소요시간(초, 서버 기준: 첫 방문~결과 저장)", assign_to_finish_s: "배정~결과 저장(초, 서버 기준)", condition: "조건: early=초기 오류(2·4·7·9회), late=후기 오류(12·14·17·19회), control=무오류", template: "단서 템플릿", assign_reused: "중도 이탈 자리 재배정(1)",
   app_version: "앱 버전", device: "기기(pc/mobile/tablet)", view: "화면 방식(3d/2d/3d_then_2d)", comp_passed: "이해 확인 통과(1)/해설 후 진행(0)", stim_sha: "단서 자료 확인값",
-  created_at: "배정 시각(UTC)", session_status: "완료/진행 중/중도 이탈", trials_done: "완료 회차 수", finished: "완료(1)", T0: "시작 전 신뢰(0~100)", rt_T0: "T0 응답시간(ms)", ts_T0: "T0 응답 시각",
+  created_at: "배정 시각(서버, UTC). 본실험은 T0 응답 직후", session_status: "완료/진행 중/중도 이탈", trials_done: "완료 회차 수", finished: "완료(1)", T0: "시작 전 신뢰(0~100)", rt_T0: "T0 응답시간(ms)", ts_T0: "T0 응답 시각",
   events_n: "진행 기록 수", practice_H_1: "연습1 선택(0=왼,1=오)", practice_rt_1: "연습1 확정까지 시간(ms)", practice_H_2: "연습2 선택", practice_rt_2: "연습2 확정까지 시간(ms)",
   comp_rt_1: "이해 확인 1차 소요(ms)", comp_rt_2: "이해 확인 2차 소요(ms)", back_pressed_n: "뒤로 가기 누른 횟수", visibility_hidden_n: "다른 앱·탭으로 벗어난 기록 수", net_error_n: "연결 오류 수", error_n: "처리 오류 수",
   gl_events: "3D 관련 기록(2D 전환 이유 등)", resumed_events_n: "이어하기 기록 수", first_event_ts: "첫 기록 시각", last_event_ts: "마지막 기록 시각",
@@ -644,6 +748,7 @@ $('b-dl-codebook').onclick = async () => {
   save(`total_codebook_${stampNow()}.csv`, ["column", "description"], cols.map(c => ({ column: c, description: CB[c] || "" })));
 };
 
+$('b-dl-alog').onclick = () => { const [cols, rows] = allocLogCsv(); if (!rows.length) return msg('data-msg', "info", "배정 기록이 없습니다."); save(`alloc_log_${stampNow()}.csv`, cols, rows); };
 $('b-del-vis').onclick = async () => {
   const ss = visibleSess(), ps = visibleParts();
   if (!ss.length && !ps.length) return msg('data-msg', "info", "지울 기록이 없습니다.");
@@ -654,7 +759,7 @@ $('b-del-vis').onclick = async () => {
   for (const p of ps) { try { await deleteDoc(doc(db, "participants", p.id)); } catch (e) { fail++; } }
   msg('data-msg', fail ? "err" : "ok", fail ? `일부(${fail}건)를 지우지 못했습니다.` : "삭제했습니다."); loadAll();
 };
-['f-cond','f-ver','f-test'].forEach(id => $(id).onchange = render); $('f-q').oninput = render; $('b-reload').onclick = loadAll;
+['f-phase','f-cond','f-ver','f-test'].forEach(id => $(id).onchange = render); $('f-q').oninput = render; $('b-reload').onclick = loadAll;
 </script>
 </body>
 </html>
