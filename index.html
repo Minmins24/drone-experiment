@@ -433,7 +433,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     <h1>실험이 끝났습니다</h1>
     <div class="status wait" id="up-status"><span class="dot"></span><span id="up-text">결과를 저장하는 중입니다…</span></div>
     <div class="btn-row" id="retry-row" hidden><button class="btn btn-primary" id="b-retry">다시 보내기</button></div>
-    <p id="end-guide"><b>결과 파일 보내기</b>를 누르면 문자·메신저 등으로 결과 파일 3개를 바로 보낼 수 있습니다. 보내기가 안 되면 <b>파일 다운로드</b>로 저장한 뒤 실험자에게 보내 주세요.</p>
+    <p id="end-guide">결과는 연구자에게 자동으로 저장되므로 <b>결과 파일 보내기는 필수가 아닙니다.</b> 자동 저장이 누락된 경우에 한해 결과 파일을 보내 달라고 요청드릴 수 있습니다. 그때는 <b>결과 파일 보내기</b>를 누르면 문자·메신저 등으로 결과 파일 3개를 바로 보낼 수 있고, 보내기가 안 되면 <b>파일 다운로드</b>로 저장한 뒤 실험자에게 보내 주세요.</p>
     <p class="muted" id="end-ios-tip"></p>
     <div class="btn-row">
       <button class="btn btn-primary" id="b-share">결과 파일 보내기</button>
@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.3",
+  appVersion: "v8.4",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -638,7 +638,7 @@ const DRONE_PRE_SURVEY = [
 const POST_SURVEY = [
   { block: "TP", type: "slider100", suffix: "", leftLabel: TRUST_LEFT, rightLabel: TRUST_RIGHT, items: [
       { id: "trust_post", text: TRUST_QP } ] },
-  { block: "A", type: "likert", points: 7, intro: "방금 함께한 드론(경로를 선택하는 자동화 시스템)에 대해 각 문장이 얼마나 해당하는지 선택해 주세요.",
+  { block: "A", type: "likert", points: 7, intro: "지금까지 함께한 경로를 선택하는 드론(AI 기반 자동화 시스템)에 대해 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
     items: [
       { id: "tia_1", text: "이 드론의 경로 선택 기능은 나를 속이려는 것 같다." },
@@ -663,8 +663,8 @@ const POST_SURVEY = [
   { block: "C", type: "likert", points: 7, leftLabel: "1", rightLabel: "7", items: [
       { id: "attn_1", text: "성실한 응답 확인을 위한 문항입니다. 이 문항에서는 \"3\"을 선택해 주세요." } ] },
   { block: "D", type: "text", required: false, maxLength: 500, items: [
-      { id: "open_1", text: "과제 중에 드론에 대한 생각이 바뀐 순간이 있었다면 자유롭게 적어 주세요.",
-        hint: "이름, 연락처 등 개인을 알아볼 수 있는 정보는 적지 마세요." } ] }
+      { id: "open_1", text: "드론에 대한 생각이 바뀐 순간이 있었나요?\n본 과제에서 느꼈던 드론에 대한 생각을 자유롭게 적어주세요.",
+        hint: "부담 없이 간단히 적어주세요." } ] }
 ];
 /* ===================================================================== */
 
@@ -1391,8 +1391,8 @@ function renderSurvey(){
       html += `<h1 style="font-size:20px">${esc(it.text)}</h1><div class="opts" data-id="${it.id}" style="flex-direction:column">` +
         it.options.map(([v, l]) => `<button type="button" class="opt" data-v="${v}" aria-pressed="false">${esc(l)}</button>`).join("") + `</div>`;
     } else if (blk.type === "text") {
-      html += `<h1 style="font-size:20px">${esc(it.text)}</h1><textarea rows="5" maxlength="${blk.maxLength}" data-id="${it.id}"></textarea>
-        <p class="muted" style="margin-top:6px">${esc(it.hint || "")} 비워 두어도 됩니다.</p>`;
+      html += `<h1 style="font-size:20px;white-space:pre-line">${esc(it.text)}</h1><textarea rows="5" maxlength="${blk.maxLength}" data-id="${it.id}"></textarea>
+        ${it.hint ? `<p class="muted" style="margin-top:6px">${esc(it.hint)}</p>` : ""}`;
     }
   });
   html += `<div class="err" id="sv-err"></div><div class="btn-row"><button class="btn btn-primary" id="b-sv">다음</button></div>`;
@@ -1860,11 +1860,11 @@ async function finish(){
     if (saved) {
       window.onbeforeunload = null; S.leaveOK = true; GUARD = false; $('retry-row').hidden = true; clearInterval(timer);
       st.className = "status ok"; tx.textContent = INAPP
-        ? "결과가 연구자에게 자동으로 저장되었습니다. 지금 화면(앱 안 브라우저)에서는 파일 저장이 안 될 수 있으니, 아래 버튼이 작동하지 않으면 그대로 창을 닫으셔도 됩니다."
-        : "결과가 연구자에게 자동으로 저장되었습니다. 혹시 모를 유실에 대비해, 아래 버튼으로 결과 파일도 실험자에게 보내 주세요.";
+        ? "결과가 연구자에게 자동으로 저장되었습니다. 결과 파일 보내기는 필수가 아니므로 이 창을 닫으셔도 됩니다."
+        : "결과가 연구자에게 자동으로 저장되었습니다. 결과 파일 보내기는 필수가 아니므로 이 창을 닫으셔도 됩니다.";
     } else {
       $('retry-row').hidden = false;
-      st.className = "status fail"; tx.textContent = "아직 저장되지 않았습니다. 이 창을 열어 두면 자동으로 다시 보냅니다. '다시 보내기'를 누르거나, 아래 버튼으로 결과 파일을 꼭 보내 주세요.";
+      st.className = "status fail"; tx.textContent = "아직 저장되지 않았습니다. 이 창을 열어 두면 자동으로 다시 보냅니다. '다시 보내기'를 누르거나, 자동 저장이 되지 않을 때에는 아래 버튼으로 결과 파일을 보내 주세요.";
       if (tries >= 60) clearInterval(timer);
     }
   };
