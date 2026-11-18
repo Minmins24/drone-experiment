@@ -507,7 +507,7 @@ function render(){
     const comp = s.comp_passed === undefined ? "" : (Number(s.comp_passed) === 1 ? "통과" : "해설 후 진행");
     return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${isMain(s) ? esc(s.seq) : `<span class="sub">P${esc(s.slot)}</span>`}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
-      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}</td><td>${esc(s.app_version)}</td>
+      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}${sm.research_data_complete !== undefined && Number(sm.research_data_complete) === 0 ? ` <span class="flag" title="사전·사후 필수 자료 중 빠진 것이 있음(pre_data_status·post_data_status 확인)">자료 누락</span>` : ""}</td><td>${esc(s.app_version)}</td>
       ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.os_name, s.view].filter(Boolean).join(" · "), "")}
       ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}
       ${td(comp, "gs")}
@@ -546,6 +546,7 @@ const GROUPS = [
   ["본 과제 요약", k => ["T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final","H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median"].includes(k)],
   ["사후 드론 신뢰 (1~7점, R=역채점)", k => /^tia_(\d|mean|distrust|trust)/.test(k) || /^stias_(\d|mean)/.test(k)],
   ["사후 설문", k => /^(mc_|attn_|open_)/.test(k) || ["trust_post","memo_used"].includes(k)],
+  ["자료 상태", k => ["pre_data_status","pre_source","post_data_status","research_data_complete","app_version_assign"].includes(k)],
   ["기타", () => true]
 ];
 const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)", ait_mean: "AI 기술적 이해 평균(14문항)",
@@ -554,6 +555,9 @@ const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채�
   comp_attempts: "시도 횟수", comp_score_1: "1차 맞힌 수(4문항)", comp_score_2: "2차 맞힌 수", comp_passed: "통과(1)·미통과(0)", comp_reviewed: "정답·해설 확인",
   T0: "시작 전 신뢰", trials_done: "완료 회차", A_rate: "위임률(전체)", A_rate_1_10: "위임률 1~10회", A_rate_11_20: "위임률 11~20회", T_mean: "신뢰 평균", T_final: "20회차 신뢰",
   H_correct_n: "본인 선택 정답 수", C_correct_n: "실제 선택 정답 수", cum_time: "누적 배송시간(초)", R_real_sum: "실제 손실 합계(초)", rt_H_median: "본인 선택 반응시간 중앙값(ms)", rt_A_median: "맡기기 반응시간 중앙값(ms)", rt_T_median: "신뢰 응답시간 중앙값(ms)",
+  pre_data_status: "사전 원응답 상태(complete=29문항 모두 유효, missing=없음, invalid=일부 누락·범위 밖)", pre_source: "사전 원응답 출처(local=브라우저, server=이어 하기 때 서버 사본에서 복원)",
+  post_data_status: "사후 필수 문항 상태(complete/missing, 자유 응답 제외)", research_data_complete: "연구자료 완결(1=사전 29문항·T0·20회·사후 필수 모두 있음, 0=아님). 과제 완료·제출 성공과는 별개",
+  app_version_assign: "배정(T0) 때의 앱 버전(app_version은 마지막 저장 때 버전)",
   trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
 let OPEN = null;
 function toggleDetail(uid, btn){

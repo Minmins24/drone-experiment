@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.4",
+  appVersion: "v8.5",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -635,6 +635,22 @@ const DRONE_PRE_SURVEY = [
       { id: "tia_pre_11", text: "나는 이 드론의 경로 선택 기능을 신뢰할 수 있다." }
     ] }
 ];
+/* 사전 원응답(배정 때 서버 세션에 함께 저장, 보안 규칙이 같은 기준으로 검사): 성향 신뢰 1–5 · AI 태도 1–5 · 사전 드론 신뢰 1–7 */
+const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, b.points])));
+const PRE_IDS = Object.keys(PRE_RANGE);
+const INFO_KEYS = ["age", "age_group", "gender", "edu", "exp_drone", "ai_use_freq", "ai_knowledge"];
+const okInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+function preStatus(sv){   // complete = 사전 원응답 전부 유효 / missing = 하나도 없음 / invalid = 일부만 있거나 범위 밖
+  const vals = PRE_IDS.map(id => sv ? sv[id] : undefined);
+  if (vals.every(v => v === undefined || v === "" || v === null)) return "missing";
+  return PRE_IDS.every(id => okInt(sv[id], 1, PRE_RANGE[id])) ? "complete" : "invalid";
+}
+function buildPre(){
+  const o = Object.fromEntries(PRE_IDS.map(id => [id, S.survey[id]]));
+  INFO_KEYS.forEach(k => o[k] = S.info[k] ?? "");
+  ["age", "ai_use_freq", "ai_knowledge"].forEach(k => o[k] = Number(o[k]));
+  return o;
+}
 const POST_SURVEY = [
   { block: "TP", type: "slider100", suffix: "", leftLabel: TRUST_LEFT, rightLabel: TRUST_RIGHT, items: [
       { id: "trust_post", text: TRUST_QP } ] },
@@ -666,6 +682,7 @@ const POST_SURVEY = [
       { id: "open_1", text: "드론에 대한 생각이 바뀐 순간이 있었나요?\n본 과제에서 느꼈던 드론에 대한 생각을 자유롭게 적어주세요.",
         hint: "부담 없이 간단히 적어주세요." } ] }
 ];
+const POST_REQUIRED = POST_SURVEY.filter(b => b.type !== "text").flatMap(b => b.items.map(it => it.id));   // 자유 응답(open_1)만 선택
 /* ===================================================================== */
 
 const $ = id => document.getElementById(id);
@@ -1284,7 +1301,6 @@ $('b-start').onclick = async () => {
     try { alloc = await net("alloc", () => BE.allocInfo(), { fatal: c => c === "permission-denied" }); } catch (e) { alloc = null; }   // 새 보안 규칙 게시 전에도 오류 반복 대신 '준비 중' 안내
     if (!alloc || !(Number(alloc.total) > 0)) { block("지금은 실험을 시작할 수 없습니다", `실험 배정 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (문의: ${CONFIG.consent.contact})`); return; }
     if (allocPlan(alloc, S.uid, Date.now()).closed) { showClosed(); return; }
-    BE.markVisit();
     setPhase("consent"); show('s-consent');
   } finally { if (!BAD_ORIGIN) { b.disabled = false; b.textContent = "시작하기"; } }
 };
@@ -1320,7 +1336,7 @@ window.addEventListener('unhandledrejection', e => {
   $('b-net').textContent = "다시 불러오기"; $('net').hidden = false;
   $('b-net').onclick = () => { S.leaveOK = true; GUARD = false; location.reload(); };
 });
-$('b-consent').onclick = () => { log("survey", { item_id: "consent", value: "agree" }); armLeaveGuard(); setPhase("info"); show('s-info'); };
+$('b-consent').onclick = () => { log("survey", { item_id: "consent", value: "agree" }); BE.markVisit(); armLeaveGuard(); setPhase("info"); show('s-info'); };   // 첫 서버 기록(동의 시각)은 동의 뒤에만
 /* 진행 중 '뒤로 가기'(안드로이드 ◁ 버튼·제스처, 아이폰 화면 끝 밀기, PC 뒤로 버튼)로 실험 화면을 벗어나지 않게:
    뒤로 가기를 누르면 같은 화면에 머물고 안내를 띄움. 창 닫기·새로고침 시에는 PC 브라우저가 확인 창을 띄움(휴대폰은 브라우저가 무시할 수 있음) */
 let GUARD = false, toastTimer;
@@ -1548,7 +1564,12 @@ function showCompReview(ans){
 async function assignWithT0(rec){
   setPhase("assign");
   await decideGL();
-  const base = Object.assign({ pid: S.pid, app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256, comp_passed: S.comp.passed ? 1 : 0, view: USE_GL() ? "3d" : "2d" }, rec);
+  if (preStatus(S.survey) !== "complete") {   // 사전 원응답이 온전하지 않으면 배정하지 않음(순번도 쓰지 않음)
+    log("error", { note: "pre_incomplete_before_assign:" + preStatus(S.survey) });
+    block("지금은 실험을 계속할 수 없습니다", `앞에서 응답한 설문 기록을 찾지 못했습니다. 이 창을 닫고 처음부터 다시 시작해 주세요. (문의: ${CONFIG.consent.contact})`); return false;
+  }
+  const base = Object.assign({ pid: S.pid, phone: S.info.phone || "", app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256, comp_passed: S.comp.passed ? 1 : 0,
+    comp_attempts: S.comp.attempts, comp_reviewed: S.comp.reviewed ? 1 : 0, view: USE_GL() ? "3d" : "2d", pre: buildPre() }, rec);
   try { S.session = await net("assign", () => BE.assign(base), { timeout: 25000, fatal: c => c === "closed" || c === "alloc_missing" || c === "alloc_row_missing" }); }
   catch (e) {
     const c = e && e.code;
@@ -1696,6 +1717,7 @@ async function runTrial(n, resumed = false){
 
 /* ---------- 이어가기: 서버 기록을 기준으로 멈춘 단계부터 ---------- */
 async function resume(){
+  restorePreFromServer();
   S.trials = await net("list", () => BE.listTrials());
   log("page", { note: "resumed" });
   const sess = S.session;
@@ -1714,6 +1736,17 @@ async function resume(){
 /* =====================================================================
    9. 사후 설문 · 디브리핑
    ===================================================================== */
+/* 이어 하기: 브라우저에 사전 원응답이 없으면 서버 세션의 원본으로 복원(다시 묻지 않음). 서버에도 없으면 누락으로 남김 */
+function restorePreFromServer(){
+  const pre = S.session && S.session.pre;
+  S.preSource = preStatus(S.survey) === "complete" ? "local" : "";
+  if (S.preSource || !pre || preStatus(pre) !== "complete") { if (!S.preSource) log("page", { note: "pre_not_restored:" + (pre ? preStatus(pre) : "no_server_copy") }); return; }
+  PRE_IDS.forEach(id => S.survey[id] = pre[id]);
+  INFO_KEYS.forEach(k => { if (S.info[k] === undefined || S.info[k] === "") S.info[k] = pre[k]; });
+  if (!S.info.phone && S.session.phone) S.info.phone = S.session.phone;
+  if (!S.comp.attempts && Number.isInteger(S.session.comp_attempts)) Object.assign(S.comp, { attempts: S.session.comp_attempts, passed: S.session.comp_passed === 1, reviewed: S.session.comp_reviewed === 1 });   // 회차별 점수(comp_score_1·2)는 복원 불가
+  S.preSource = "server"; log("page", { note: "pre_restored_from_server" }); persistLocal();
+}
 function startPost(idx = 0){ sceneOff(); setPhase("post_survey"); runSurvey(POST_SURVEY, "실험 후 설문", () => { S.postDone = true; persistLocal(); setPhase("debrief"); showDebrief(); }, idx); }
 function showDebrief(){
   $('debrief-body').innerHTML = `
@@ -1774,7 +1807,7 @@ function buildSummary(rows){
   const o = {
     pid: S.pid, uid: S.uid, seq: s.seq ?? "", alloc: s.alloc ?? "pilot", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
     device: S.device, os: OS, os_name: s.os_name ?? OS_NAME, browser: s.browser ?? BROWSER, screen_w: s.screen_w ?? screen.width, screen_h: s.screen_h ?? screen.height, orientation: s.orientation ?? "", inapp: INAPP, screen: `${screen.width}x${screen.height}@${window.devicePixelRatio || 1}`, hidden_n: HIDDEN_N, gl_lost: GL_LOST ? 1 : 0,
-    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone, ai_use_freq: S.info.ai_use_freq === undefined ? "" : Number(S.info.ai_use_freq), ai_knowledge: S.info.ai_knowledge === undefined ? "" : Number(S.info.ai_knowledge),
+    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : (GL_DECIDED === null && s.view ? s.view : "2d"), three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone, ai_use_freq: S.info.ai_use_freq === undefined ? "" : Number(S.info.ai_use_freq), ai_knowledge: S.info.ai_knowledge === undefined ? "" : Number(S.info.ai_knowledge),
     comp_attempts: S.comp.attempts, comp_score_1: S.comp.results[0] ?? "", comp_score_2: S.comp.results[1] ?? "", comp_passed: S.comp.passed ? 1 : 0, comp_reviewed: S.comp.reviewed ? 1 : 0,
     T0: s.T0 ?? "", trials_done: done.length,
     A_rate: r4(mean(nums("A"))), A_rate_1_10: r4(mean(win(1, 10).map(r => r.A))), A_rate_11_20: r4(mean(win(11, 20).map(r => r.A))),
@@ -1792,7 +1825,10 @@ function buildSummary(rows){
     ai_neg_mean: sv.ai_1 === undefined ? "" : r4(mean(AI_REVERSE.map(id => Number(sv[id])))),                                      // 부정 6문항(원점수)
     ...tia(true), ...tia(false),
     trust_post: sv.trust_post ?? "", mc_accuracy: sv.mc_accuracy ?? "", mc_error_noticed: sv.mc_error_noticed ?? "", memo_used: sv.memo_used ?? "", attn_1: sv.attn_1 ?? "", attn_pass: sv.attn_1 === undefined ? "" : (Number(sv.attn_1) === 3 ? 1 : 0),
-    open_1: sv.open_1 || "", total_time_s: Math.round((performance.now() - S.startT) / 1000), app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256,
+    open_1: sv.open_1 || "", total_time_s: Math.round((performance.now() - S.startT) / 1000), app_version: CONFIG.appVersion, app_version_assign: s.app_version ?? "", stim_sha: CONFIG.stimulusSha256,
+    pre_data_status: preStatus(sv), pre_source: S.preSource || (preStatus(sv) === "complete" ? "local" : ""),
+    post_data_status: POST_REQUIRED.every(id => sv[id] !== undefined && sv[id] !== "" && sv[id] !== null) ? "complete" : "missing",
+    research_data_complete: (preStatus(sv) === "complete" && done.length === CONFIG.nTrials && Number.isInteger(s.T0) && POST_REQUIRED.every(id => sv[id] !== undefined && sv[id] !== "" && sv[id] !== null)) ? 1 : 0,
     notes: S.notes.join(";")
   });
   return o;
@@ -1805,7 +1841,7 @@ const SUM_COLS = ["pid","uid","seq","alloc","slot","cell","condition","template"
   ...Array.from({ length: AI_N }, (_, i) => "ai_" + (i + 1)), "ai_mean","ai_pos_mean","ai_neg_mean",
   "tia_pre_1","tia_pre_2","tia_pre_3","tia_pre_4","tia_pre_5","tia_pre_6","tia_pre_7","tia_pre_8","tia_pre_9","tia_pre_10","tia_pre_11","tia_pre_mean","tia_pre_distrust_mean","tia_pre_trust_mean",
   "tia_1","tia_2","tia_3","tia_4","tia_5","tia_6","tia_7","tia_8","tia_9","tia_10","tia_11","tia_mean","tia_distrust_mean","tia_trust_mean",
-  "trust_post","mc_accuracy","mc_error_noticed","memo_used","attn_1","attn_pass","open_1","total_time_s","app_version","stim_sha","notes"];
+  "trust_post","mc_accuracy","mc_error_noticed","memo_used","attn_1","attn_pass","open_1","total_time_s","app_version","app_version_assign","stim_sha","pre_data_status","pre_source","post_data_status","research_data_complete","notes"];
 function clean(v){ return (v === undefined || v === null || (typeof v === "number" && !Number.isFinite(v))) ? "" : v; }
 function stamp(){ const d = new Date(), p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
 let FILES = null;
@@ -1820,7 +1856,7 @@ function baseRecord(condOverride){
     events: { name: S.finishId + "_events.csv", text: toCSV(S.events, EV_COLS) }
   };
   const s = S.session || {};
-  return { id: S.finishId, slot: s.slot ?? null, seq: s.seq ?? null, summary,
+  return { id: S.uid ? "s_" + S.uid : S.finishId, slot: s.slot ?? null, seq: s.seq ?? null, summary,   // 결과 문서 이름 = 세션마다 하나(새로고침·중복 클릭·두 탭에도 결과 1개)
     doc: Object.assign(s.seq != null ? { seq: s.seq, alloc: s.alloc } : {}, { pid: S.pid, phone: clean(S.info.phone), uid: S.uid, slot: s.seq ?? s.slot ?? 0, condition: condOverride || s.condition, template: s.template || "",
       app_version: CONFIG.appVersion, summary: sumClean, summary_cols: SUM_COLS, trials_cols: TR_COLS, trials_csv: FILES.trials.text,
       events_cols: EV_COLS, events_csv: FILES.events.text }) };
