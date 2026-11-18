@@ -54,6 +54,9 @@ input[type=text],input[type=tel],input[type=number],textarea{width:100%;font:inh
   border-radius:10px;background:#fff;color:var(--ink)}
 input:focus,textarea:focus,.btn:focus-visible,.opt:focus-visible,.pick:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts.scale{flex-wrap:nowrap;gap:6px}.opts.scale .opt{flex:1 1 0;min-width:0;padding:8px 0;text-align:center}
+.scale-ends{display:flex;justify-content:space-between;gap:12px;margin-top:6px;font-size:13px;color:var(--muted)}.scale-ends span:last-child{text-align:right}
+.opts.ordinal{flex-direction:column}
 .opt{flex:1 1 auto;min-height:48px;padding:8px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font-weight:600;text-align:left}
 .opt.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
 .err{color:var(--bad);font-size:14px;min-height:20px;margin-top:6px}
@@ -284,6 +287,15 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <div class="opts" data-name="exp_drone">
         <button class="opt" data-v="none">없음</button><button class="opt" data-v="few">1~2번</button><button class="opt" data-v="many">여러 번</button>
       </div></div>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술이 포함된 제품 및 서비스를 얼마나 자주 사용해 보셨습니까?</span>
+      <div class="opts scale" data-name="ai_use_freq">
+        <button class="opt" data-v="1">1</button><button class="opt" data-v="2">2</button><button class="opt" data-v="3">3</button><button class="opt" data-v="4">4</button><button class="opt" data-v="5">5</button><button class="opt" data-v="6">6</button><button class="opt" data-v="7">7</button>
+      </div>
+      <div class="scale-ends"><span>1 = 전혀 사용하지 않는다</span><span>7 = 매우 자주 사용한다</span></div></div>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI에 대해 어느 정도 알고 있다고 생각하십니까?</span>
+      <div class="opts ordinal" data-name="ai_knowledge">
+        <button class="opt" data-v="1">전혀 모른다</button><button class="opt" data-v="2">조금 안다</button><button class="opt" data-v="3">어느 정도 안다</button><button class="opt" data-v="4">많이 안다</button><button class="opt" data-v="5">매우 많이 안다</button>
+      </div></div>
     <div class="err" id="info-err"></div>
     <div class="btn-row"><button class="btn btn-primary" id="b-info">다음</button></div>
   </div>
@@ -502,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.0",
+  appVersion: "v8.1",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -1339,11 +1351,11 @@ $('b-info').onclick = () => {
   if (!S.info.age_group) return err.textContent = "연령대를 선택해 주세요.";
   { const g = age >= 60 ? "60s" : (Math.floor(age / 10) * 10) + "s";   // 입력한 만 나이와 고른 연령대가 맞는지 확인
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
-  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
+  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["exp_drone","드론 경험을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["ai_knowledge","AI에 대해 알고 있는 정도를"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
-  for (const k of ["age","age_group","gender","edu","exp_drone"]) log("survey", { item_id: k, value: S.info[k] });
+  for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge"]) log("survey", { item_id: k, value: S.info[k] });
   setPhase("pre_survey");
   runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); });
 };
@@ -1752,7 +1764,7 @@ function buildSummary(rows){
   const o = {
     pid: S.pid, uid: S.uid, seq: s.seq ?? "", alloc: s.alloc ?? "pilot", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition ?? "none", template: s.template ?? "", assign_reused: s.assign_reused ?? "",
     device: S.device, os: OS, os_name: s.os_name ?? OS_NAME, browser: s.browser ?? BROWSER, screen_w: s.screen_w ?? screen.width, screen_h: s.screen_h ?? screen.height, orientation: s.orientation ?? "", inapp: INAPP, screen: `${screen.width}x${screen.height}@${window.devicePixelRatio || 1}`, hidden_n: HIDDEN_N, gl_lost: GL_LOST ? 1 : 0,
-    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone,
+    ua: UA.slice(0, 250), view: GL_DECIDED ? (GL_LOST ? "3d_then_2d" : "3d") : "2d", three_src: window.__threeSource || ("none:" + THREE_FAILS.join("|")).slice(0, 200), phone: S.info.phone, age: S.info.age, age_group: S.info.age_group, gender: S.info.gender, edu: S.info.edu ?? "", exp_drone: S.info.exp_drone, ai_use_freq: S.info.ai_use_freq === undefined ? "" : Number(S.info.ai_use_freq), ai_knowledge: S.info.ai_knowledge === undefined ? "" : Number(S.info.ai_knowledge),
     comp_attempts: S.comp.attempts, comp_score_1: S.comp.results[0] ?? "", comp_score_2: S.comp.results[1] ?? "", comp_passed: S.comp.passed ? 1 : 0, comp_reviewed: S.comp.reviewed ? 1 : 0,
     T0: s.T0 ?? "", trials_done: done.length,
     A_rate: r4(mean(nums("A"))), A_rate_1_10: r4(mean(win(1, 10).map(r => r.A))), A_rate_11_20: r4(mean(win(11, 20).map(r => r.A))),
@@ -1775,7 +1787,7 @@ function buildSummary(rows){
   });
   return o;
 }
-const SUM_COLS = ["pid","uid","seq","alloc","slot","cell","condition","template","assign_reused","device","os","os_name","browser","screen_w","screen_h","orientation","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","edu","exp_drone",
+const SUM_COLS = ["pid","uid","seq","alloc","slot","cell","condition","template","assign_reused","device","os","os_name","browser","screen_w","screen_h","orientation","inapp","screen","hidden_n","gl_lost","ua","view","three_src","phone","age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge",
   "comp_attempts","comp_score_1","comp_score_2","comp_passed","comp_reviewed","T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final",
   "H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median","resumed_n",
   ...Array.from({ length: 20 }, (_, i) => "H_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "A_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "T_" + (i + 1)),
