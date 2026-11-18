@@ -525,7 +525,8 @@ const LBL = {
   exp_drone: { yes: "예", no: "아니오", none: "없음(이전 문항)", few: "1~2번(이전 문항)", many: "여러 번(이전 문항)" },
   ai_knowledge: { 1: "1 전혀 모른다", 2: "2 조금 안다", 3: "3 어느 정도 안다", 4: "4 많이 안다", 5: "5 매우 많이 안다" },
   edu: { middle_or_less: "중학교 졸업 이하", high: "고등학교 졸업", college: "대학교 졸업", grad: "대학원 재학 이상" },
-  mc_error_noticed: { yes: "있었다", no: "없었다", unsure: "잘 모르겠다" }
+  mc_error_noticed: { yes: "있었다", no: "없었다", unsure: "잘 모르겠다" },
+  memo_used: { yes: "예", no: "아니오" }
 };
 const ITEM = {   // 문항 짧은 이름(전체 문구는 실험앱 화면 기준)
   ptt_1: "신뢰하는 쪽을 더 선호", ptt_2: "R 불확실성 감당 못해 좀처럼 불신", ptt_3: "자동화 시스템은 유능", ptt_4: "R 능력에 경계심", ptt_5: "R 돕고 지원할 마음 기대 안 함", ptt_6: "하겠다고 한 일 수행 믿음",
@@ -544,7 +545,7 @@ const GROUPS = [
   ["이해 확인", k => /^comp_/.test(k)],
   ["본 과제 요약", k => ["T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final","H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median"].includes(k)],
   ["사후 드론 신뢰 (1~7점, R=역채점)", k => /^tia_(\d|mean|distrust|trust)/.test(k) || /^stias_(\d|mean)/.test(k)],
-  ["사후 설문", k => /^(mc_|attn_|open_)/.test(k)],
+  ["사후 설문", k => /^(mc_|attn_|open_)/.test(k) || ["trust_post","memo_used"].includes(k)],
   ["기타", () => true]
 ];
 const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)", ait_mean: "AI 기술적 이해 평균(14문항)",
@@ -553,7 +554,7 @@ const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채�
   comp_attempts: "시도 횟수", comp_score_1: "1차 맞힌 수(4문항)", comp_score_2: "2차 맞힌 수", comp_passed: "통과(1)·미통과(0)", comp_reviewed: "정답·해설 확인",
   T0: "시작 전 신뢰", trials_done: "완료 회차", A_rate: "위임률(전체)", A_rate_1_10: "위임률 1~10회", A_rate_11_20: "위임률 11~20회", T_mean: "신뢰 평균", T_final: "20회차 신뢰",
   H_correct_n: "본인 선택 정답 수", C_correct_n: "실제 선택 정답 수", cum_time: "누적 배송시간(초)", R_real_sum: "실제 손실 합계(초)", rt_H_median: "본인 선택 반응시간 중앙값(ms)", rt_A_median: "맡기기 반응시간 중앙값(ms)", rt_T_median: "신뢰 응답시간 중앙값(ms)",
-  mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
+  trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
 let OPEN = null;
 function toggleDetail(uid, btn){
   const panel = $('detail');
