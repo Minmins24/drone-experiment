@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.5.2",
+  appVersion: "v8.5.3",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -619,7 +619,7 @@ const PRE_SURVEY = [
 ];
 /* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(3 / 3)으로 표시 */
 const DRONE_PRE_SURVEY = [
-  { block: "P3", type: "likert", points: 7, intro: "과제에서 함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
+  { block: "P3", type: "likert", points: 7, intro: "함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
     items: [
       { id: "tia_pre_1", text: "이 드론의 경로 선택 기능은 나를 속이려는 것 같다." },
