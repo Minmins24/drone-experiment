@@ -65,7 +65,7 @@ input:focus,textarea:focus,.btn:focus-visible,.opt:focus-visible,.pick:focus-vis
 /* likert */
 .lk-item{padding:14px 0;border-top:1px solid var(--line)}
 .lk-item:first-of-type{border-top:none}
-.lk-q{font-weight:650;margin-bottom:10px}
+.lk-q{font-weight:650;margin-bottom:10px;white-space:pre-line}
 .lk{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .lk button{min-height:46px;border:1px solid var(--line);border-radius:10px;background:#fff;font-weight:700;color:var(--ink)}
 .lk button.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.5.1",
+  appVersion: "v8.5.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -593,7 +593,7 @@ const PRE_SURVEY = [
   { block: "P1", type: "likert", points: 5, intro: "자동화 시스템에 대한 평소 생각을 묻습니다. 각 문장에 얼마나 동의하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "5 = 매우 그렇다",
     items: [
-      { id: "ptt_1", text: "자동화된 기술 시스템을 신뢰했다가 때로는 좋지 않은 결과를 겪을 수 있더라도, 나는 여전히 이러한 시스템을 신뢰하지 않는 것보다 신뢰하는 쪽을 선호한다." },
+      { id: "ptt_1", text: "자동화된 기술 시스템을 신뢰했다가 때로는 좋지 않은 결과를 겪을 수 있더라도,\n나는 여전히 이러한 시스템을 신뢰하지 않는 것보다 신뢰하는 쪽을 선호한다." },
       { id: "ptt_2", text: "나는 불확실성을 감당할 수 없어서 자동화된 기술 시스템을 좀처럼 신뢰하지 않는다." },
       { id: "ptt_3", text: "자동화된 기술 시스템은 유능하다." },
       { id: "ptt_4", text: "나는 자동화된 기술 시스템의 능력에 대해 경계심을 갖고 있다." },
