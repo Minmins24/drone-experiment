@@ -47,8 +47,6 @@ ol.info3{margin:0;padding-left:22px}ol.info3 li{margin:2px 0}
 .ai-cmp .k{font-size:13px;font-weight:750;letter-spacing:.02em;color:var(--muted)}
 .ai-cmp .box.ai{border:2px solid var(--accent);background:#fff}
 .ai-cmp .box.ai .k{color:var(--ink)}
-#s-ai-intro .nw{white-space:nowrap}
-@media (max-width:520px){ #s-ai-intro br.w{display:none} }   /* 좁은 화면에서는 강제 줄바꿈 대신 자연 줄바꿈 */
 @media (max-width:520px){ .ai-cmp{grid-template-columns:1fr} }
 .btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 22px;border-radius:12px;
   border:1px solid transparent;font-weight:700;font-size:17px;transition:background .15s,opacity .15s}
@@ -317,11 +315,11 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
     <h2 class="h2s">인공지능(AI)이란</h2>
     <p>AI는 사람이 정해 준 목표에 맞춰, 입력된 정보로부터 <b>예측·추천·결정</b> 등을 이끌어 내는 컴퓨터 시스템입니다. 사람이 정해 준 규칙만 그대로 따르는 것이 아니라, 주로 <b>자료에서 배운 패턴</b>을 이용해 결과를 이끌어 냅니다.</p>
     <h2 class="h2s">자동화 시스템이란</h2>
-    <p>사람이 하던 일(정보 모으기, 따져 보기, 결정하기, 실행하기)의 <b>일부나 전부를 기계가 대신</b> <br class="w">해 주는 시스템입니다.</p>
+    <p>사람이 하던 일(정보 모으기, 따져 보기, 결정하기, 실행하기)의 <b>일부나 전부를 기계가 대신</b> 해 주는 시스템입니다.</p>
     <h2 class="h2s">두 개념의 관계: 로봇청소기로 보면</h2>
     <div class="ai-cmp">
-      <div class="box"><span class="k">규칙 기반 자동화 시스템</span><span>"부딪히면 방향을 바꾼다"처럼 <b class="nw">정해진 규칙대로만</b> 움직이는 로봇청소기는 규칙 기반 자동화 시스템입니다.</span></div>
-      <div class="box ai"><span class="k">AI 기반 자동화 시스템</span><span>카메라 영상을 보고 양말이나 전선을 <b class="nw">알아본 뒤</b> <br class="w"><b>피해 가는</b> 로봇청소기는 AI 기반 자동화 시스템입니다.</span></div>
+      <div class="box"><span class="k">규칙 기반 자동화 시스템</span><span>"부딪히면 방향을 바꾼다"처럼 <b>정해진 규칙대로만</b> 움직이는 로봇청소기는 규칙 기반 자동화 시스템입니다.</span></div>
+      <div class="box ai"><span class="k">AI 기반 자동화 시스템</span><span>카메라 영상을 보고 양말이나 전선을 <b>알아본 뒤 피해 가는</b> 로봇청소기는 AI 기반 자동화 시스템입니다.</span></div>
     </div>
     <p>둘 다 사람 대신 청소를 하는 자동화 시스템입니다. 다른 점은 <b>AI를 이용하는지 여부</b>입니다.</p>
     <div class="box em">이 연구에서는 AI를 이용해 사람의 일을 대신 해 주는 시스템을<br><b>AI 기반 자동화 시스템</b>이라고 부릅니다.</div>
@@ -542,7 +540,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.6.1",
+  appVersion: "v8.6.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
