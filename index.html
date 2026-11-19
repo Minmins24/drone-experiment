@@ -283,7 +283,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <div class="opts" data-name="edu">
         <button class="opt" data-v="middle_or_less">중학교 졸업 이하</button><button class="opt" data-v="high">고등학교 졸업</button><button class="opt" data-v="college">대학교 졸업</button><button class="opt" data-v="grad">대학원 재학 이상</button>
       </div></div>
-    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">과거에 드론을 조작해 본 적이 있으십니까?</span>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">드론을 직접 조종해 본 적이 있습니까?</span>
       <div class="opts" data-name="exp_drone">
         <button class="opt" data-v="yes">예</button><button class="opt" data-v="no">아니오</button>
       </div></div>
@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.5.7",
+  appVersion: "v8.5.8",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
