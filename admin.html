@@ -548,7 +548,8 @@ const GROUPS = [
   ["이해 확인", k => /^comp_/.test(k)],
   ["본 과제 요약", k => ["T0","trials_done","A_rate","A_rate_1_10","A_rate_11_20","T_mean","T_final","H_correct_n","C_correct_n","cum_time","R_real_sum","rt_H_median","rt_A_median","rt_T_median"].includes(k)],
   ["사후 드론 신뢰 (1~7점, R=역채점)", k => /^tia_(\d|mean|distrust|trust)/.test(k) || /^stias_(\d|mean)/.test(k)],
-  ["사후 설문", k => /^(mc_|attn_|open_)/.test(k) || ["trust_post","memo_used"].includes(k)],
+  ["주의점검 (v8.8.3부터 실험 전 설문 2쪽)", k => /^attn_/.test(k)],
+  ["사후 설문", k => /^(mc_|open_)/.test(k) || ["trust_post","memo_used"].includes(k)],
   ["자료 상태", k => ["pre_data_status","pre_source","post_data_status","research_data_complete","app_version_assign"].includes(k)],
   ["기타", () => true]
 ];
@@ -561,7 +562,7 @@ const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채�
   pre_data_status: "사전 원응답 상태(complete=29문항 모두 유효, missing=없음, invalid=일부 누락·범위 밖)", pre_source: "사전 원응답 출처(local=브라우저, server=이어 하기 때 서버 사본에서 복원)",
   post_data_status: "사후 필수 문항 상태(complete/missing; v8.5.9부터 자유 응답 open_1 포함, 그 이전은 제외)", research_data_complete: "연구자료 완결(1=사전 29문항·T0·20회·사후 필수 모두 있음, 0=아님). 과제 완료·제출 성공과는 별개",
   app_version_assign: "배정(T0) 때의 앱 버전(app_version은 마지막 저장 때 버전)",
-  trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답(드론에 대한 생각이 바뀐 순간·느낀 점, 최대 500자). v8.5.9부터 필수(한 글자 이상), 그 이전은 선택 — app_version으로 구분", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
+  trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(1~7, 정답 3). v8.8.3부터 실험 전 설문 2쪽(자동화 성향 다음), 그 이전은 실험 후 설문 6쪽 — app_version으로 구분", attn_pass: "주의점검 통과(attn_1=3이면 1)", open_1: "자유 응답(드론에 대한 생각이 바뀐 순간·느낀 점, 최대 500자). v8.5.9부터 필수(한 글자 이상), 그 이전은 선택 — app_version으로 구분", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
 let OPEN = null;
 function toggleDetail(uid, btn){
   const panel = $('detail');

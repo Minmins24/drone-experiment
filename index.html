@@ -550,7 +550,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.8.2",
+  appVersion: "v8.8.3",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -636,6 +636,9 @@ const PRE_SURVEY = [
       { id: "ptt_5", text: "나는 자동화된 기술 시스템이 사람들을 기꺼이 돕고 지원할 마음이 있다고 기대하지 않는다." },
       { id: "ptt_6", text: "나는 자동화된 기술 시스템이 하겠다고 한 일을 실제로 수행하리라는 점에서 믿을 만하다고 느낀다." }
     ] },
+  // v8.8.3: 주의 확인 문항을 실험 후 설문 6쪽에서 이곳(실험 전 설문 2쪽)으로 옮김. 사전 원응답(pre)에는 넣지 않음(inPre: false → 보안 규칙 변경 불필요)
+  { block: "C", type: "likert", points: 7, inPre: false, leftLabel: "1", rightLabel: "7", items: [
+      { id: "attn_1", text: "성실한 응답 확인을 위한 문항입니다. 이 문항에서는 \"3\"을 선택해 주세요." } ] },
   { block: "P2", type: "likert", points: 5, intro: "인공지능(AI)에 대한 평소 생각을 묻습니다. 각 문장에 얼마나 동의하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "5 = 매우 그렇다",
     items: [
@@ -664,7 +667,7 @@ const PRE_SURVEY = [
       { id: "mails_6", text: "나는 AI의 가능한 미래 용도를 상상할 수 있다." }
     ] }
 ];
-/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(4 / 4)으로 표시 */
+/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(5 / 5)으로 표시 */
 const DRONE_PRE_SURVEY = [
   { block: "P3", type: "likert", points: 7, intro: "함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
@@ -683,8 +686,8 @@ const DRONE_PRE_SURVEY = [
     ] }
 ];
 /* 사전 원응답(배정 때 서버 세션에 함께 저장, 보안 규칙이 같은 기준으로 검사): 성향 신뢰 1–5 · AI 태도 1–5 · 사전 드론 신뢰 1–7 */
-const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, (b.start ?? 1) + b.points - 1])));   // 최댓값
-const PRE_MIN = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, b.start ?? 1])));   // 최솟값(0~10점 척도는 0)
+const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].filter(b => b.inPre !== false).flatMap(b => b.items.map(it => [it.id, (b.start ?? 1) + b.points - 1])));   // 최댓값
+const PRE_MIN = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].filter(b => b.inPre !== false).flatMap(b => b.items.map(it => [it.id, b.start ?? 1])));   // 최솟값(0~10점 척도는 0)
 const MAILS_IDS = ["mails_1","mails_2","mails_3","mails_4","mails_5","mails_6"];
 const PRE_IDS = Object.keys(PRE_RANGE);
 const INFO_KEYS = ["age", "age_group", "gender", "edu", "exp_drone", "ai_use_freq"];   // v8.7.1: ai_knowledge 문항 삭제(요약 열은 빈칸으로 유지)
@@ -725,8 +728,6 @@ const POST_SURVEY = [
         options: [["yes","있었다"],["no","없었다"],["unsure","잘 모르겠다"]] } ] },
   { block: "B3", type: "choice", items: [
       { id: "memo_used", text: "본 과제를 메모하며 진행하셨나요?", options: [["yes","예"],["no","아니오"]] } ] },
-  { block: "C", type: "likert", points: 7, leftLabel: "1", rightLabel: "7", items: [
-      { id: "attn_1", text: "성실한 응답 확인을 위한 문항입니다. 이 문항에서는 \"3\"을 선택해 주세요." } ] },
   { block: "D", type: "text", required: true, maxLength: 500, items: [
       { id: "open_1", text: "드론에 대한 생각이 바뀐 순간이 있었나요?\n본 과제에서 느꼈던 드론에 대한 생각을 자유롭게 적어주세요.",
         hint: "부담 없이 간단히 적어주세요." } ] }
