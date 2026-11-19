@@ -300,6 +300,11 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <div class="opts" data-name="edu">
         <button class="opt" data-v="middle_or_less">중학교 졸업 이하</button><button class="opt" data-v="high">고등학교 졸업</button><button class="opt" data-v="college">대학교 졸업</button><button class="opt" data-v="grad">대학원 재학 이상</button>
       </div></div>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술이 포함된 제품 및 서비스를 얼마나 자주 사용해 보셨습니까?</span>
+      <div class="opts scale" data-name="ai_use_freq">
+        <button class="opt" data-v="1">1</button><button class="opt" data-v="2">2</button><button class="opt" data-v="3">3</button><button class="opt" data-v="4">4</button><button class="opt" data-v="5">5</button><button class="opt" data-v="6">6</button><button class="opt" data-v="7">7</button>
+      </div>
+      <div class="scale-ends"><span>1 = 전혀 사용하지 않는다</span><span>7 = 매우 자주 사용한다</span></div></div>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:2px">드론에 대한 이전 경험을 선택해 주세요.</span>
       <span class="muted" style="display:block;font-size:13px;margin-bottom:8px">여러 항목에 해당하면 번호가 가장 큰 항목 하나를 선택해 주세요.</span>
       <div class="opts col" data-name="exp_drone">
@@ -308,11 +313,6 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
         <button class="opt" data-v="onsite"><span class="n">③</span><span>현장에서 비행을 관찰한 경험 있음</span></button>
         <button class="opt" data-v="piloted"><span class="n">④</span><span>드론을 직접 조종한 경험 있음</span></button>
       </div></div>
-    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술이 포함된 제품 및 서비스를 얼마나 자주 사용해 보셨습니까?</span>
-      <div class="opts scale" data-name="ai_use_freq">
-        <button class="opt" data-v="1">1</button><button class="opt" data-v="2">2</button><button class="opt" data-v="3">3</button><button class="opt" data-v="4">4</button><button class="opt" data-v="5">5</button><button class="opt" data-v="6">6</button><button class="opt" data-v="7">7</button>
-      </div>
-      <div class="scale-ends"><span>1 = 전혀 사용하지 않는다</span><span>7 = 매우 자주 사용한다</span></div></div>
     <div class="err" id="info-err"></div>
     <div class="btn-row"><button class="btn btn-primary" id="b-info">다음</button></div>
   </div>
@@ -550,7 +550,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.8.0",
+  appVersion: "v8.8.1",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -1424,7 +1424,7 @@ $('b-info').onclick = () => {
   if (!S.info.age_group) return err.textContent = "연령대를 선택해 주세요.";
   { const g = age >= 60 ? "60s" : (Math.floor(age / 10) * 10) + "s";   // 입력한 만 나이와 고른 연령대가 맞는지 확인
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
-  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["exp_drone","드론 경험을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
+  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
