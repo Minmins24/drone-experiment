@@ -140,13 +140,13 @@ td.na{color:#b0b6b1}
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
         <thead>
-          <tr class="grp"><th colspan="9">기본</th><th colspan="6">참가자</th><th colspan="4">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="4">사후</th><th></th></tr>
+          <tr class="grp"><th colspan="9">기본</th><th colspan="6">참가자</th><th colspan="6">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="6">사후</th><th></th></tr>
           <tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th title="본실험: 배정표 seq / 파일럿: P+이전 순번">seq</th><th>조건</th><th>템플릿</th><th>진행</th><th>상태</th><th>버전</th>
           <th class="gs">나이</th><th>연령대</th><th>성별</th><th>최종 학력</th><th>드론 경험</th><th title="기기 · 화면 방식(3D/2D)">기기·화면</th>
-          <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="AI 기술적 이해 14문항 평균(역채점 없음, 1~5점)">AI 이해</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th>
+          <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="AI 기술적 이해 14문항 평균(역채점 없음, 1~5점)">AI 이해</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th><th title="사전 신뢰 하위척도: 6~11번 6문항 평균(원점수, 1~7점, 높을수록 신뢰)">사전 신뢰(6)</th><th title="사전 불신 하위척도: 1~5번 5문항 평균(원점수, 1~7점, 높을수록 불신)">사전 불신(5)</th>
           <th class="gs" title="통과=1차 또는 2차에 4문항 모두 정답 / 해설 후 진행=2회 미통과">결과</th>
           <th class="gs" title="본 과제 시작 전 신뢰(0~100)">T0</th><th title="20회 중 드론에 맡긴 비율">위임률</th><th title="회차별 신뢰(0~100) 평균">평균 T</th><th title="20회차 신뢰">마지막 T</th><th title="본인 선택이 실제로 더 빠른 경로였던 횟수">본인 정답</th><th title="실제 사용한 경로가 더 빠른 경로였던 횟수">실제 정답</th><th>누적시간</th>
-          <th class="gs" title="사후 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th title="드론 선택이 맞았다고 생각한 비율(%)">지각된 정확도</th><th title="드론이 느린 경로를 고른 회차가 있었다고 느꼈는지">오류 인식</th><th>주의점검</th>
+          <th class="gs" title="사후 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th title="사후 신뢰 하위척도: 6~11번 6문항 평균(원점수, 1~7점, 높을수록 신뢰)">사후 신뢰(6)</th><th title="사후 불신 하위척도: 1~5번 5문항 평균(원점수, 1~7점, 높을수록 불신)">사후 불신(5)</th><th title="드론 선택이 맞았다고 생각한 비율(%)">지각된 정확도</th><th title="드론이 느린 경로를 고른 회차가 있었다고 느꼈는지">오류 인식</th><th>주의점검</th>
           <th>전체 값</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table></div>
@@ -509,12 +509,12 @@ function render(){
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${isMain(s) ? esc(s.seq) : `<span class="sub">P${esc(s.slot)}</span>`}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
       <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}${sm.research_data_complete !== undefined && Number(sm.research_data_complete) === 0 ? ` <span class="flag" title="사전·사후 필수 자료 중 빠진 것이 있음(pre_data_status·post_data_status 확인)">자료 누락</span>` : ""}</td><td>${esc(s.app_version)}</td>
       ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.os_name, s.view].filter(Boolean).join(" · "), "")}
-      ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}
+      ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}${td(sm.tia_pre_trust_mean)}${td(sm.tia_pre_distrust_mean)}
       ${td(comp, "gs")}
       ${td(s.T0, "num gs")}${td(aRate)}${td(tMean)}${td(last.T)}${td(hc)}${td(cc)}${td(cum)}
-      ${td(sm.tia_mean ?? sm.stias_mean, "num gs")}${td(sm.mc_accuracy)}${td(LBL.mc_error_noticed[sm.mc_error_noticed] ?? sm.mc_error_noticed, "")}<td>${sm.attn_pass === "" || sm.attn_pass === undefined ? '<span class="na">–</span>' : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
+      ${td(sm.tia_mean ?? sm.stias_mean, "num gs")}${td(sm.tia_trust_mean)}${td(sm.tia_distrust_mean)}${td(sm.mc_accuracy)}${td(LBL.mc_error_noticed[sm.mc_error_noticed] ?? sm.mc_error_noticed, "")}<td>${sm.attn_pass === "" || sm.attn_pass === undefined ? '<span class="na">–</span>' : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
       <td><button class="btn sm" data-detail="${esc(s.uid)}">${OPEN === s.uid ? "닫기" : "보기"}</button></td></tr>`;
-  }).join("") || `<tr><td colspan="30" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
+  }).join("") || `<tr><td colspan="34" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
   document.querySelectorAll('[data-detail]').forEach(b => b.onclick = () => toggleDetail(b.dataset.detail, b));
 }
 
@@ -556,9 +556,9 @@ const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채�
   T0: "시작 전 신뢰", trials_done: "완료 회차", A_rate: "위임률(전체)", A_rate_1_10: "위임률 1~10회", A_rate_11_20: "위임률 11~20회", T_mean: "신뢰 평균", T_final: "20회차 신뢰",
   H_correct_n: "본인 선택 정답 수", C_correct_n: "실제 선택 정답 수", cum_time: "누적 배송시간(초)", R_real_sum: "실제 손실 합계(초)", rt_H_median: "본인 선택 반응시간 중앙값(ms)", rt_A_median: "맡기기 반응시간 중앙값(ms)", rt_T_median: "신뢰 응답시간 중앙값(ms)",
   pre_data_status: "사전 원응답 상태(complete=29문항 모두 유효, missing=없음, invalid=일부 누락·범위 밖)", pre_source: "사전 원응답 출처(local=브라우저, server=이어 하기 때 서버 사본에서 복원)",
-  post_data_status: "사후 필수 문항 상태(complete/missing, 자유 응답 제외)", research_data_complete: "연구자료 완결(1=사전 29문항·T0·20회·사후 필수 모두 있음, 0=아님). 과제 완료·제출 성공과는 별개",
+  post_data_status: "사후 필수 문항 상태(complete/missing; v8.5.9부터 자유 응답 open_1 포함, 그 이전은 제외)", research_data_complete: "연구자료 완결(1=사전 29문항·T0·20회·사후 필수 모두 있음, 0=아님). 과제 완료·제출 성공과는 별개",
   app_version_assign: "배정(T0) 때의 앱 버전(app_version은 마지막 저장 때 버전)",
-  trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
+  trust_post: "실험 후 드론 신뢰(0~100, T0와 같은 막대: 방금 사용한 드론의 경로 선택을 얼마나 신뢰하는지)", memo_used: "본 과제를 메모하며 진행(yes=예, no=아니오)", mc_accuracy: "지각된 드론 정확도(%)", mc_error_noticed: "드론 오류 인식", attn_1: "주의점검 응답(정답 3)", attn_pass: "주의점검 통과", open_1: "자유 응답(드론에 대한 생각이 바뀐 순간·느낀 점, 최대 500자). v8.5.9부터 필수(한 글자 이상), 그 이전은 선택 — app_version으로 구분", total_time_s: "총 소요시간(초)", resumed_n: "이어하기 회차 수" };
 let OPEN = null;
 function toggleDetail(uid, btn){
   const panel = $('detail');

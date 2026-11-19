@@ -514,7 +514,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.5.8",
+  appVersion: "v8.5.9",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -678,11 +678,11 @@ const POST_SURVEY = [
       { id: "memo_used", text: "본 과제를 메모하며 진행하셨나요?", options: [["yes","예"],["no","아니오"]] } ] },
   { block: "C", type: "likert", points: 7, leftLabel: "1", rightLabel: "7", items: [
       { id: "attn_1", text: "성실한 응답 확인을 위한 문항입니다. 이 문항에서는 \"3\"을 선택해 주세요." } ] },
-  { block: "D", type: "text", required: false, maxLength: 500, items: [
+  { block: "D", type: "text", required: true, maxLength: 500, items: [
       { id: "open_1", text: "드론에 대한 생각이 바뀐 순간이 있었나요?\n본 과제에서 느꼈던 드론에 대한 생각을 자유롭게 적어주세요.",
         hint: "부담 없이 간단히 적어주세요." } ] }
 ];
-const POST_REQUIRED = POST_SURVEY.filter(b => b.type !== "text").flatMap(b => b.items.map(it => it.id));   // 자유 응답(open_1)만 선택
+const POST_REQUIRED = POST_SURVEY.filter(b => b.required !== false).flatMap(b => b.items.map(it => it.id));   // v8.5.9부터 자유 응답(open_1)도 필수(공백만은 안 됨)
 /* ===================================================================== */
 
 const $ = id => document.getElementById(id);
@@ -1424,7 +1424,7 @@ function renderSurvey(){
   $('b-sv').onclick = () => {
     if (blk.type === "text") card.querySelectorAll('textarea').forEach(t => ans[t.dataset.id] = t.value.trim().slice(0, blk.maxLength));
     const missing = blk.items.filter(it => ans[it.id] === undefined || ans[it.id] === "");
-    if (blk.required !== false && missing.length) { $('sv-err').textContent = "모든 문항에 응답해 주세요."; return; }
+    if (blk.required !== false && missing.length) { $('sv-err').textContent = blk.type === "text" ? "한 글자 이상 적어 주세요." : "모든 문항에 응답해 주세요."; return; }
     const rt = (performance.now() - pageT0).toFixed(0);
     blk.items.forEach(it => { const v = ans[it.id] ?? ""; S.survey[it.id] = v; log("survey", { item_id: it.id, value: v, rt_ms: rt }); });
     SV.idx++;
