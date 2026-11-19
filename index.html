@@ -61,6 +61,11 @@ input[type=text],input[type=tel],input[type=number],textarea{width:100%;font:inh
   border-radius:10px;background:#fff;color:var(--ink)}
 input:focus,textarea:focus,.btn:focus-visible,.opt:focus-visible,.pick:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts.col{flex-direction:column}
+.opts.col .opt{text-align:left;display:flex;gap:8px;align-items:baseline}
+.opts.col .opt .n{font-weight:750;flex:none}
+.opts.col .opt .ex{font-size:13px;color:var(--muted);font-weight:500}
+.opts.col .opt.sel .ex{color:inherit;opacity:.8}
 .opts.scale{flex-wrap:nowrap;gap:6px}.opts.scale .opt{flex:1 1 0;min-width:0;padding:8px 0;text-align:center}
 .scale-ends{display:flex;justify-content:space-between;gap:12px;margin-top:6px;font-size:13px;color:var(--muted)}.scale-ends span:last-child{text-align:right}
 .opts.ordinal{flex-direction:column}
@@ -290,9 +295,13 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
       <div class="opts" data-name="edu">
         <button class="opt" data-v="middle_or_less">중학교 졸업 이하</button><button class="opt" data-v="high">고등학교 졸업</button><button class="opt" data-v="college">대학교 졸업</button><button class="opt" data-v="grad">대학원 재학 이상</button>
       </div></div>
-    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">드론을 직접 조종해 본 적이 있습니까?</span>
-      <div class="opts" data-name="exp_drone">
-        <button class="opt" data-v="yes">예</button><button class="opt" data-v="no">아니오</button>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:2px">드론에 대한 이전 경험을 선택해 주세요.</span>
+      <span class="muted" style="display:block;font-size:13px;margin-bottom:8px">여러 항목에 해당하면 번호가 가장 큰 항목 하나를 선택해 주세요.</span>
+      <div class="opts col" data-name="exp_drone">
+        <button class="opt" data-v="never"><span class="n">①</span><span>비행 관찰·조종 경험 없음</span></button>
+        <button class="opt" data-v="media"><span class="n">②</span><span>매체를 통한 비행 관찰만 있음 <span class="ex">(예: 영상, TV, SNS)</span></span></button>
+        <button class="opt" data-v="onsite"><span class="n">③</span><span>현장에서 비행을 관찰한 경험 있음</span></button>
+        <button class="opt" data-v="piloted"><span class="n">④</span><span>드론을 직접 조종한 경험 있음</span></button>
       </div></div>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술이 포함된 제품 및 서비스를 얼마나 자주 사용해 보셨습니까?</span>
       <div class="opts scale" data-name="ai_use_freq">
@@ -540,7 +549,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.6.3",
+  appVersion: "v8.7.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
