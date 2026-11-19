@@ -140,10 +140,10 @@ td.na{color:#b0b6b1}
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
         <thead>
-          <tr class="grp"><th colspan="9">기본</th><th colspan="6">참가자</th><th colspan="6">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="6">사후</th><th></th></tr>
+          <tr class="grp"><th colspan="9">기본</th><th colspan="6">참가자</th><th colspan="7">사전 척도</th><th colspan="1">이해 확인</th><th colspan="7">본 과제 (서버 기록)</th><th colspan="6">사후</th><th></th></tr>
           <tr><th>시작</th><th>뒷자리</th><th>전화번호</th><th title="본실험: 배정표 seq / 파일럿: P+이전 순번">seq</th><th>조건</th><th>템플릿</th><th>진행</th><th>상태</th><th>버전</th>
           <th class="gs">나이</th><th>연령대</th><th>성별</th><th>최종 학력</th><th>드론 경험</th><th title="기기 · 화면 방식(3D/2D)">기기·화면</th>
-          <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="AI 기술적 이해 14문항 평균(역채점 없음, 1~5점)">AI 이해</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th><th title="사전 신뢰 하위척도: 6~11번 6문항 평균(원점수, 1~7점, 높을수록 신뢰)">사전 신뢰(6)</th><th title="사전 불신 하위척도: 1~5번 5문항 평균(원점수, 1~7점, 높을수록 불신)">사전 불신(5)</th>
+          <th class="gs" title="자동화 성향적 신뢰 6문항 평균(2·4·5번 역채점, 1~5점)">성향 신뢰</th><th title="AI 태도 12문항 평균(2·4·7·8·10·12번 역채점, 1~5점)">AI 태도</th><th title="AI 능력 자기평가 6문항 평균(0~10점, v8.8.0부터)">AI 능력</th><th title="AI 기술적 이해 14문항 평균(역채점 없음, 1~5점)">AI 이해</th><th title="사전 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사전 드론 신뢰</th><th title="사전 신뢰 하위척도: 6~11번 6문항 평균(원점수, 1~7점, 높을수록 신뢰)">사전 신뢰(6)</th><th title="사전 불신 하위척도: 1~5번 5문항 평균(원점수, 1~7점, 높을수록 불신)">사전 불신(5)</th>
           <th class="gs" title="통과=1차 또는 2차에 4문항 모두 정답 / 해설 후 진행=2회 미통과">결과</th>
           <th class="gs" title="본 과제 시작 전 신뢰(0~100)">T0</th><th title="20회 중 드론에 맡긴 비율">위임률</th><th title="회차별 신뢰(0~100) 평균">평균 T</th><th title="20회차 신뢰">마지막 T</th><th title="본인 선택이 실제로 더 빠른 경로였던 횟수">본인 정답</th><th title="실제 사용한 경로가 더 빠른 경로였던 횟수">실제 정답</th><th>누적시간</th>
           <th class="gs" title="사후 드론 신뢰 11문항 평균(1~5번 역채점, 1~7점)">사후 드론 신뢰</th><th title="사후 신뢰 하위척도: 6~11번 6문항 평균(원점수, 1~7점, 높을수록 신뢰)">사후 신뢰(6)</th><th title="사후 불신 하위척도: 1~5번 5문항 평균(원점수, 1~7점, 높을수록 불신)">사후 불신(5)</th><th title="드론 선택이 맞았다고 생각한 비율(%)">지각된 정확도</th><th title="드론이 느린 경로를 고른 회차가 있었다고 느꼈는지">오류 인식</th><th>주의점검</th>
@@ -509,12 +509,12 @@ function render(){
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${isMain(s) ? esc(s.seq) : `<span class="sub">P${esc(s.slot)}</span>`}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
       <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}${sm.research_data_complete !== undefined && Number(sm.research_data_complete) === 0 ? ` <span class="flag" title="사전·사후 필수 자료 중 빠진 것이 있음(pre_data_status·post_data_status 확인)">자료 누락</span>` : ""}</td><td>${esc(s.app_version)}</td>
       ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.os_name, s.view].filter(Boolean).join(" · "), "")}
-      ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}${td(sm.tia_pre_trust_mean)}${td(sm.tia_pre_distrust_mean)}
+      ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.mails_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}${td(sm.tia_pre_trust_mean)}${td(sm.tia_pre_distrust_mean)}
       ${td(comp, "gs")}
       ${td(s.T0, "num gs")}${td(aRate)}${td(tMean)}${td(last.T)}${td(hc)}${td(cc)}${td(cum)}
       ${td(sm.tia_mean ?? sm.stias_mean, "num gs")}${td(sm.tia_trust_mean)}${td(sm.tia_distrust_mean)}${td(sm.mc_accuracy)}${td(LBL.mc_error_noticed[sm.mc_error_noticed] ?? sm.mc_error_noticed, "")}<td>${sm.attn_pass === "" || sm.attn_pass === undefined ? '<span class="na">–</span>' : (Number(sm.attn_pass) === 1 ? "통과" : '<span class="flag">실패</span>')}</td>
       <td><button class="btn sm" data-detail="${esc(s.uid)}">${OPEN === s.uid ? "닫기" : "보기"}</button></td></tr>`;
-  }).join("") || `<tr><td colspan="34" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
+  }).join("") || `<tr><td colspan="35" class="sub" style="padding:18px">표시할 세션이 없습니다.</td></tr>`;
   document.querySelectorAll('[data-detail]').forEach(b => b.onclick = () => toggleDetail(b.dataset.detail, b));
 }
 
@@ -532,14 +532,17 @@ const ITEM = {   // 문항 짧은 이름(전체 문구는 실험앱 화면 기�
   ptt_1: "신뢰하는 쪽을 더 선호", ptt_2: "R 불확실성 감당 못해 좀처럼 불신", ptt_3: "자동화 시스템은 유능", ptt_4: "R 능력에 경계심", ptt_5: "R 돕고 지원할 마음 기대 안 함", ptt_6: "하겠다고 한 일 수행 믿음",
   ai_1: "세상을 더 낫게", ai_2: "R 강한 거부감", ai_3: "AI 기술 사용해 보고 싶음", ai_4: "R 단점이 더 많음", ai_5: "발전 기대", ai_6: "문제 해결책 제시", ai_7: "R AI 없는 기술 선호", ai_8: "R 두려움", ai_9: "AI 적용 기술 선택", ai_10: "R 새 문제 발생", ai_11: "대체로 긍정적 감정", ai_12: "R 가급적 사용 안 함"
 };
+const MAILS_ITEM = ["주제의 가장 중요한 개념을 앎", "AI의 정의들을 앎", "AI 사용의 한계와 기회를 평가", "AI 사용의 장점과 단점을 평가", "AI의 새로운 용도를 떠올림", "AI의 가능한 미래 용도를 상상"];
 const TIA_ITEM = ["R 속이려는 것 같다", "R 정직하지 못한 방식", "R 작동·결과 의심", "R 경계하게 됨", "R 해롭거나 위험", "확신을 가짐", "보안성 제공", "정직하다", "믿고 맡길 수 있다", "신뢰할 수 있다", "나는 신뢰할 수 있다"];
 ["학습-검증-테스트 절차·목적", "딥러닝과 머신러닝의 관계", "규칙 기반 vs 학습 기반", "AI의 의사결정 방식", "강화학습 원리·예시", "General AI vs Narrow AI", "AI 데이터 수집·활용", "인공 신경망", "머신러닝 작동 방식", "지도 vs 비지도 학습", "설명가능한 AI(XAI)", "환경 인식과 작동", "빅데이터 개념", "영화·게임 속 AI vs 실제 AI"].forEach((t, i) => { ITEM["ait_" + (i + 1)] = t; });
 TIA_ITEM.forEach((t, i) => { ITEM["tia_pre_" + (i + 1)] = t; ITEM["tia_" + (i + 1)] = t; });
+MAILS_ITEM.forEach((t, i) => { ITEM["mails_" + (i + 1)] = t; });
 const GROUPS = [
   ["참가자 정보", k => ["pid","phone","age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge"].includes(k)],
   ["배정·기기", k => ["uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","view","three_src","gl_lost","hidden_n","ua","app_version","stim_sha","total_time_s","resumed_n","notes"].includes(k)],
   ["자동화 성향적 신뢰 (1~5점, R=역채점)", k => /^ptt_/.test(k)],
   ["AI 태도 (1~5점, R=역채점)", k => /^ai_/.test(k)],
+  ["AI 능력 자기평가 (0~10점)", k => /^mails_/.test(k)],
   ["AI 기술적 이해 (1~5점)", k => /^ait_/.test(k)],
   ["사전 드론 신뢰 (1~7점, R=역채점)", k => /^tia_pre_/.test(k) || /^stias_pre/.test(k)],
   ["이해 확인", k => /^comp_/.test(k)],
@@ -549,7 +552,7 @@ const GROUPS = [
   ["자료 상태", k => ["pre_data_status","pre_source","post_data_status","research_data_complete","app_version_assign"].includes(k)],
   ["기타", () => true]
 ];
-const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)", ait_mean: "AI 기술적 이해 평균(14문항)",
+const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)", ait_mean: "AI 기술적 이해 평균(14문항)", mails_mean: "평균(0~10)",
   tia_pre_mean: "평균(역채점 반영)", tia_pre_distrust_mean: "불신 5문항 평균(원점수)", tia_pre_trust_mean: "신뢰 6문항 평균", tia_mean: "평균(역채점 반영)", tia_distrust_mean: "불신 5문항 평균(원점수)", tia_trust_mean: "신뢰 6문항 평균",
   age: "만 나이", age_group: "연령대", gender: "성별", edu: "최종 학력", exp_drone: "드론 이전 경험. v8.7.0부터 문항 '드론에 대한 이전 경험을 선택해 주세요.'(여러 항목에 해당하면 가장 큰 번호 하나): never=① 비행 관찰·조종 경험 없음, media=② 매체를 통한 비행 관찰만 있음, onsite=③ 현장에서 비행을 관찰한 경험 있음, piloted=④ 드론을 직접 조종한 경험 있음(순서형 1~4로 쓸 때 never=1 … piloted=4). 그 이전 기록: yes/no(v8.5.8~v8.6.3 '드론을 직접 조종해 본 적이 있습니까?', 그 전 '과거에 드론을 조작해 본 적이 있으십니까?'), v8.1 이전 none/few/many. 비교할 때 yes≈piloted, no≈never·media·onsite — app_version으로 구분", ai_use_freq: "AI 제품·서비스 사용 빈도(1=전혀 사용하지 않는다 ~ 7=매우 자주 사용한다)", ai_knowledge: "AI 기술과 그 능력·한계·필요 조건·활용에 대해 알고 있는 정도(1=별로 알지 못한다, 2=조금 알고 있다, 3=중간 정도 알고 있다, 4=많이 알고 있다, 5=매우 많이 알고 있다). v8.7.1부터 문항 삭제 → 그 이후 참여자는 빈칸 — app_version으로 구분", phone: "전화번호", pid: "뒷자리",
   comp_attempts: "시도 횟수", comp_score_1: "1차 맞힌 수(4문항)", comp_score_2: "2차 맞힌 수", comp_passed: "통과(1)·미통과(0)", comp_reviewed: "정답·해설 확인",
@@ -747,7 +750,8 @@ const CB = Object.assign({}, {
   net_cue_ms: "단서 받기 통신(ms)", net_out_ms: "결과 받기 통신(ms)", ts_cue: "단서 표시 시각", ts_H: "본인 선택 시각", ts_A: "맡김 결정 시각", ts_result: "결과 표시 시각", ts_T: "신뢰 응답 시각",
   os: "운영체제", inapp: "앱 안 브라우저", screen: "화면 크기", hidden_n: "다른 앱·탭으로 벗어난 횟수", gl_lost: "3D 해제됨(1)", ua: "브라우저 정보", three_src: "3D 부품 출처", notes: "앱 내부 메모(오류·전환 등)"
 }, KEYLBL);
-Object.keys(ITEM).forEach(k => { CB[k] = (/^tia_pre_/.test(k) ? "사전 드론 신뢰 " : /^tia_/.test(k) ? "사후 드론 신뢰 " : /^ptt_/.test(k) ? "성향적 신뢰 " : /^ait_/.test(k) ? "AI 기술적 이해 " : "AI 태도 ") + k.replace(/^\D+_/, "") + "번: " + ITEM[k] + (/^tia/.test(k) ? " (1~7)" : " (1~5)"); });
+Object.keys(ITEM).forEach(k => { CB[k] = (/^tia_pre_/.test(k) ? "사전 드론 신뢰 " : /^tia_/.test(k) ? "사후 드론 신뢰 " : /^ptt_/.test(k) ? "성향적 신뢰 " : /^ait_/.test(k) ? "AI 기술적 이해 " : /^mails_/.test(k) ? "AI 능력 자기평가 " : "AI 태도 ") + k.replace(/^\D+_/, "") + "번: " + ITEM[k] + (/^tia/.test(k) ? " (1~7)" : /^mails_/.test(k) ? " (0~10; 0=해당 능력이 전혀 없거나 거의 없는 수준, 10=해당 능력이 매우 뛰어나거나 (거의) 완벽한 수준; v8.8.0부터, 그 이전 참여자는 빈칸)" : " (1~5)"); });
+CB.mails_mean = "AI 능력 자기평가 6문항 평균(0~10, 역채점 없음; v8.8.0부터)";
 $('b-dl-codebook').onclick = async () => {
   if (!STIM) try { STIM = await loadStimFromServer(); } catch (e) {}
   const rows = totalRows(), cols = rows.length ? totalCols(rows) : [...SESS_COLS, ...TRIAL_ONLY];

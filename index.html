@@ -82,6 +82,11 @@ input:focus,textarea:focus,.btn:focus-visible,.opt:focus-visible,.pick:focus-vis
 .lk button{min-height:46px;border:1px solid var(--line);border-radius:10px;background:#fff;font-weight:700;color:var(--ink)}
 .lk button.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
 .lk-ends{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:4px}
+.lk.lk-wide{gap:3px}
+.lk.lk-wide button{min-height:42px;padding:0;font-size:14px;border-radius:8px}
+.lk.lk-wide + .lk-ends{gap:12px}
+.lk.lk-wide + .lk-ends span{flex:1}
+.lk.lk-wide + .lk-ends span:last-child{text-align:right}
 /* slider (손잡이는 처음 누를 때까지 숨김: 기본값 없음) */
 .sl-wrap{margin:14px 0 6px}
 .sl-val{font-size:40px;font-weight:800;text-align:center;font-variant-numeric:tabular-nums;min-height:56px;color:var(--ink)}
@@ -545,7 +550,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.7.1",
+  appVersion: "v8.8.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -646,9 +651,20 @@ const PRE_SURVEY = [
       { id: "ai_10", text: "AI는 문제를 해결하기보다는 새로운 문제를 발생시키는 경우가 많다." },
       { id: "ai_11", text: "나는 AI에 대해 대체로 긍정적인 감정을 갖고 있다." },
       { id: "ai_12", text: "나는 AI를 기반으로 한 기술을 가급적 사용하지 않으려 한다." }
+    ] },
+  // v8.8.0: AI 관련 능력 자기평가 6문항(0~10점). 실험 전 설문 3쪽(과제 배경 앞)
+  { block: "P4", type: "likert", start: 0, points: 11, intro: "인공지능(AI)과 관련된 자신의 능력을 묻습니다. 각 문장에 대해 지금 자신의 능력이 어느 정도인지 0~10점 중에서 선택해 주세요.",
+    leftLabel: "0 = 해당 능력이 전혀 없거나 거의 없는 수준임", rightLabel: "10 = 해당 능력이 매우 뛰어나거나 (거의) 완벽한 수준임",
+    items: [
+      { id: "mails_1", text: "나는 '인공지능'이라는 주제의 가장 중요한 개념들을 알고 있다." },
+      { id: "mails_2", text: "나는 인공지능의 정의들을 알고 있다." },
+      { id: "mails_3", text: "나는 한 AI를 사용하는 것의 한계와 기회가 무엇인지 평가할 수 있다." },
+      { id: "mails_4", text: "나는 한 인공지능을 사용하는 것이 어떤 장점과 단점을 수반하는지 평가할 수 있다." },
+      { id: "mails_5", text: "나는 AI의 새로운 용도를 떠올릴 수 있다." },
+      { id: "mails_6", text: "나는 AI의 가능한 미래 용도를 상상할 수 있다." }
     ] }
 ];
-/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(3 / 3)으로 표시 */
+/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(4 / 4)으로 표시 */
 const DRONE_PRE_SURVEY = [
   { block: "P3", type: "likert", points: 7, intro: "함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
@@ -667,14 +683,16 @@ const DRONE_PRE_SURVEY = [
     ] }
 ];
 /* 사전 원응답(배정 때 서버 세션에 함께 저장, 보안 규칙이 같은 기준으로 검사): 성향 신뢰 1–5 · AI 태도 1–5 · 사전 드론 신뢰 1–7 */
-const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, b.points])));
+const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, (b.start ?? 1) + b.points - 1])));   // 최댓값
+const PRE_MIN = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].flatMap(b => b.items.map(it => [it.id, b.start ?? 1])));   // 최솟값(0~10점 척도는 0)
+const MAILS_IDS = ["mails_1","mails_2","mails_3","mails_4","mails_5","mails_6"];
 const PRE_IDS = Object.keys(PRE_RANGE);
 const INFO_KEYS = ["age", "age_group", "gender", "edu", "exp_drone", "ai_use_freq"];   // v8.7.1: ai_knowledge 문항 삭제(요약 열은 빈칸으로 유지)
 const okInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 function preStatus(sv){   // complete = 사전 원응답 전부 유효 / missing = 하나도 없음 / invalid = 일부만 있거나 범위 밖
   const vals = PRE_IDS.map(id => sv ? sv[id] : undefined);
   if (vals.every(v => v === undefined || v === "" || v === null)) return "missing";
-  return PRE_IDS.every(id => okInt(sv[id], 1, PRE_RANGE[id])) ? "complete" : "invalid";
+  return PRE_IDS.every(id => okInt(sv[id], PRE_MIN[id], PRE_RANGE[id])) ? "complete" : "invalid";
 }
 function buildPre(){
   const o = Object.fromEntries(PRE_IDS.map(id => [id, S.survey[id]]));
@@ -1431,9 +1449,9 @@ function renderSurvey(){
   if (blk.intro) html += `<h1 style="font-size:20px">${esc(blk.intro)}</h1>`;
   blk.items.forEach(it => {
     if (blk.type === "likert") {
-      const pts = blk.points || 7;
-      html += `<div class="lk-item"><div class="lk-q">${esc(it.text)}</div><div class="lk" role="group" aria-label="${esc(it.text)}" data-id="${it.id}" style="grid-template-columns:repeat(${pts},1fr)">` +
-        Array.from({ length: pts }, (_, k) => k + 1).map(n => `<button type="button" data-v="${n}" aria-pressed="false">${n}</button>`).join("") +
+      const pts = blk.points || 7, st = blk.start ?? 1;
+      html += `<div class="lk-item"><div class="lk-q">${esc(it.text)}</div><div class="lk${pts > 7 ? " lk-wide" : ""}" role="group" aria-label="${esc(it.text)}" data-id="${it.id}" style="grid-template-columns:repeat(${pts},1fr)">` +
+        Array.from({ length: pts }, (_, k) => k + st).map(n => `<button type="button" data-v="${n}" aria-pressed="false">${n}</button>`).join("") +
         `</div><div class="lk-ends"><span>${esc(blk.leftLabel)}</span><span>${esc(blk.rightLabel)}</span></div></div>`;
     } else if (blk.type === "slider100") {
       html += `<h1 style="font-size:20px">${esc(it.text)}</h1><div data-slider="${it.id}"></div>`;
@@ -1852,7 +1870,8 @@ function buildSummary(rows){
     resumed_n: done.filter(r => Number(r.resumed) === 1).length
   };
   rows.forEach(r => { o["H_" + r.trial] = r.H ?? ""; o["A_" + r.trial] = r.A ?? ""; o["T_" + r.trial] = r.T ?? ""; });
-  Object.assign(o, Object.fromEntries(pttIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(aiIds.map(id => [id, sv[id] ?? ""])), {
+  Object.assign(o, Object.fromEntries(pttIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(aiIds.map(id => [id, sv[id] ?? ""])), Object.fromEntries(MAILS_IDS.map(id => [id, sv[id] ?? ""])), {
+    mails_mean: sv.mails_1 === undefined ? "" : r4(mean(MAILS_IDS.map(id => Number(sv[id])))),   // AI 능력 자기평가 6문항 평균(0~10)
     ptt_mean: sv.ptt_1 === undefined ? "" : r4(mean(pttIds.map(ptt))),
     ai_mean: sv.ai_1 === undefined ? "" : r4(mean(aiIds.map(ai))),                                            // 12문항 평균(역채점 반영)
     ai_pos_mean: sv.ai_1 === undefined ? "" : r4(mean(aiIds.filter(id => !AI_REVERSE.includes(id)).map(id => Number(sv[id])))),   // 긍정 6문항(원점수)
@@ -1873,6 +1892,7 @@ const SUM_COLS = ["pid","uid","seq","alloc","slot","cell","condition","template"
   ...Array.from({ length: 20 }, (_, i) => "H_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "A_" + (i + 1)), ...Array.from({ length: 20 }, (_, i) => "T_" + (i + 1)),
   ...Array.from({ length: PTT_N }, (_, i) => "ptt_" + (i + 1)), "ptt_mean",
   ...Array.from({ length: AI_N }, (_, i) => "ai_" + (i + 1)), "ai_mean","ai_pos_mean","ai_neg_mean",
+  "mails_1","mails_2","mails_3","mails_4","mails_5","mails_6","mails_mean",
   "tia_pre_1","tia_pre_2","tia_pre_3","tia_pre_4","tia_pre_5","tia_pre_6","tia_pre_7","tia_pre_8","tia_pre_9","tia_pre_10","tia_pre_11","tia_pre_mean","tia_pre_distrust_mean","tia_pre_trust_mean",
   "tia_1","tia_2","tia_3","tia_4","tia_5","tia_6","tia_7","tia_8","tia_9","tia_10","tia_11","tia_mean","tia_distrust_mean","tia_trust_mean",
   "trust_post","mc_accuracy","mc_error_noticed","memo_used","attn_1","attn_pass","open_1","total_time_s","app_version","app_version_assign","stim_sha","pre_data_status","pre_source","post_data_status","research_data_complete","notes"];
