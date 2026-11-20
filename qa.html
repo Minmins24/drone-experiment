@@ -26,7 +26,7 @@ th{background:#f3f4f1}
   <h1>실험앱 서버 잠금 점검 (실서버 · v8 배정표 포함)</h1>
   <p class="muted">이 페이지는 <b>실제 Firebase 서버와 실제 보안 규칙</b>에 시험 참가자(뒷자리 0000)로 접속해, 정답이 단계보다 먼저 새지 않는지와 잘못된 기록이 거부되는지를 하나씩 시도합니다. 연구자만 쓰고, 참가자에게 주소를 보내지 마세요.</p>
   <div class="card">
-    <p>점검은 본실험 배정표의 seq 1개를 쓰고, 1~2회차 기록을 남깁니다. 끝난 뒤 <b>admin.html</b> 2번 칸의 <b>시험 배정 되돌리기 (뒷자리 0000만)</b>를 누르면 본실험이 다시 seq 1부터 시작됩니다.</p>
+    <p>점검은 본실험 배정표의 seq 1개를 쓰고, 1~2회차 기록을 남깁니다. 실제 참가자가 이미 있으면 되돌릴 수 없고, 이 seq는 완료되지 않으므로 90분 뒤 다음 참가자에게 같은 조건으로 재발급됩니다(조건 균형 유지). 꼭 필요할 때만 실행하세요.</p>
     <p class="muted" style="margin-top:6px">먼저 admin.html에서 동결 CSV(1번)와 본실험 배정표(2번)를 올리고, 새 보안 규칙을 게시해 두어야 합니다.</p>
     <div style="margin-top:12px"><button class="btn" id="b-run">점검 실행</button></div>
     <p id="sum" style="margin-top:12px;font-weight:700"></p>
@@ -74,7 +74,7 @@ $('b-run').onclick = async () => {
     await expectDeny("배정 전 결과 읽기", () => getDoc(doc(db, "outcomes", "V4-B1N", "c", "control", "t", "t01")));
     await expectDeny("연구자용 값(F·EV) 읽기", () => getDoc(doc(db, "research", "V4-B1N", "t", "t01")));
     const aref = doc(db, "meta", "alloc");
-    const A0 = await expectOk("본실험 배정 상태 읽기", async () => (await getDoc(aref)).data(), d => d && d.sha === ALLOC_SHA && d.total === 300 ? true : "배정표 없음/해시 다름");
+    const A0 = await expectOk("본실험 배정 상태 읽기", async () => (await getDoc(aref)).data(), d => d && d.sha === ALLOC_SHA && Number(d.total) >= 1 && (!d.phases || d.phases.some(x => x.ver === "v4.2" && x.sha === "b6e5b7afb0a251343d039b2dc5c7b3c67a8c99134b72a0a27f54c6277e46f2fe")) ? true : "배정표 없음/해시 다름");
     await expectDeny("배정 전 배정표 행 읽기 (seq 1)", () => getDoc(doc(db, "alloc", "1")));
     await expectDeny("배정 기록 읽기", () => getDoc(doc(db, "alloc_log", "1_0")));
     const PRE = Object.assign(Object.fromEntries([...Array.from({ length: 6 }, (_, i) => ["ptt_" + (i + 1), 3]), ...Array.from({ length: 12 }, (_, i) => ["ai_" + (i + 1), 3]), ...Array.from({ length: 11 }, (_, i) => ["tia_pre_" + (i + 1), 4])]),

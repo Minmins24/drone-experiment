@@ -104,6 +104,16 @@ td.na{color:#b0b6b1}
       <p class="sub" id="seq-info" style="margin-top:10px"></p>
       <div class="row" style="margin-top:8px"><button class="btn" id="b-alloc-testreset" title="배정된 사람이 모두 시험 참가자(뒷자리 0000)일 때만 됩니다">시험 배정 되돌리기 (뒷자리 0000만)</button>
         <span class="sub">qa.html 점검이나 직접 시험으로 쓴 seq를 지우고 본실험이 seq 1부터 시작되게 합니다. 실제 참가자가 한 명이라도 배정되면 누를 수 없습니다.</span></div>
+      <div class="box" id="v42-box" style="margin-top:12px;padding:10px 12px;border:1px solid var(--line,#ddd);border-radius:10px">
+        <h3 style="margin:0 0 4px">배정표 v4.2 (E:L:C = 2:2:1) 이어 붙이기</h3>
+        <p class="sub">이미 쓴 seq(1~n)는 v3 그대로 두고, <b>다음 seq(n+1)부터 v4.2 300행을 1행부터</b> 붙입니다. 한 번만 할 수 있고 되돌릴 수 없습니다. 참가자 앱과 보안 규칙은 바꾸지 않습니다. 02_앱업로드용_배정표_v4.2_2-2-1_1-300명.csv만 받습니다(SHA-256 <code>b6e5b7af…f2fe</code>).</p>
+        <p class="sub" id="v42-state"></p>
+        <div class="row" style="margin-top:6px"><input type="file" id="f-alloc2" accept=".csv,text/csv"><button class="btn primary" id="b-alloc2" disabled>검사 후 이어 붙이기</button></div>
+        <h3 style="margin:12px 0 4px">모집 마감 인원 (v4.2 기준)</h3>
+        <p class="sub">v4.2 구간에서 새로 발급할 seq 수 m을 정하면, 그 뒤로는 <b>새 seq는 주지 않고 미완료 seq 재발급만</b> 계속합니다(보고서 5절 권고). 5의 배수면 정확히 2:2:1, 30의 배수면 템플릿까지 완전 균형입니다. 언제든 다시 늘릴 수 있습니다.</p>
+        <div class="row" style="margin-top:6px"><input type="number" id="i-cap" min="1" max="300" step="1" placeholder="예: 100" style="width:110px"><button class="btn" id="b-cap" disabled>마감 인원 저장</button></div>
+        <div class="msg" id="alloc2-msg" hidden></div>
+      </div>
       <p class="sub" style="margin-top:6px"><b>배정 규칙</b>: 시작 전 신뢰(T0)에 답한 직후, 1회차 직전에 배정표의 다음 seq를 받습니다(그 전에 그만둔 사람은 seq를 쓰지 않음). 한 번 받은 seq는 다시 접속해도 유지됩니다. <b>재발급</b>: 배정 후 90분 안에 끝내지 못한 seq는(1회차 이후 이탈 포함) 다음 참가자가 배정을 받을 때 가장 작은 번호부터 같은 조건·템플릿으로 다시 발급합니다. 원래 배정자가 다시 접속하면 원래 배정으로 이어서 진행합니다. 300행을 모두 쓰면 새 참가자에게 '모집 마감'을 보여 줍니다.</p>
       <div class="tbl-wrap"><table id="bal"></table></div>
       <h3 style="margin-top:14px">재발급 기록</h3>
@@ -168,14 +178,16 @@ const FROZEN_SHA = "cfb1a097ab0e52aecc11f5a19760fd37832b87032ec30f9a367581aaf66c
 const CONDS = ["early", "late", "control"], CNAME = { early: "초기 오류", late: "후기 오류", control: "무오류 통제", none: "이해확인 미통과" };
 const TEMPLATES = ["V4-B1N", "V4-B1M", "V4-B2N", "V4-B2M", "V4-B3N", "V4-B3M"];
 const SLOT_TIMEOUT_MIN = 90;   // index.html CONFIG.slotTimeoutMin과 같게
-const ALLOC_SHA = "67ca9426d8326dbe6828c4e209b234196d74f8966a30ba31e221db5ee71e8e83", ALLOC_TOTAL = 300, ALLOC_VER = "v3";   // 02 배정표 확인값(index.html CONFIG.alloc과 같게)
+const ALLOC_SHA = "67ca9426d8326dbe6828c4e209b234196d74f8966a30ba31e221db5ee71e8e83", ALLOC_TOTAL = 300, ALLOC_VER = "v3";
+// v4.2(E:L:C = 2:2:1) 이어 붙이기용: 02_앱업로드용_배정표_v4.2_2-2-1_1-300명.csv (seed 20261122)
+const ALLOC2_SHA = "b6e5b7afb0a251343d039b2dc5c7b3c67a8c99134b72a0a27f54c6277e46f2fe", ALLOC2_VER = "v4.2", ALLOC2_ROWS = 300, ALLOC2_CNT = { E: 120, L: 120, C: 60 };   // 02 배정표 확인값(index.html CONFIG.alloc과 같게)
 const ALLOC_CODE = { E: "early", L: "late", C: "control" };
 const COLS = ("template trial item_id left_base left_delay_pct left_penalty right_base right_delay_pct right_penalty EV_left EV_right EV_gap F F_wrong left_delay right_delay left_actual right_actual Y actual_gap D_early D_late D_control").split(" ");
 const PUBLIC = ["template","trial","item_id","left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty"];
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, setDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, setDoc, writeBatch, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
@@ -406,6 +418,87 @@ $('b-alloc-up').onclick = async () => {
   } catch (e) { msg('alloc-msg', "err", e.code === "started" ? `올리지 못했습니다: ${e.message}.` : `올리지 못했습니다 (${e.code || e.message}).`); }
   finally { btn.textContent = "검사 후 서버에 올리기"; btn.disabled = !APEND; }
 };
+/* ── v4.2 이어 붙이기: seq → 어느 배정표의 몇 번째 행인지 ── */
+const phase2 = () => ((ALLOC && ALLOC.phases) || []).find(x => x.ver === ALLOC2_VER) || null;
+function tableOf(seq){
+  const k = Number(seq); if (!Number.isFinite(k) || k < 1) return { table: "", tseq: "" };
+  const p2 = phase2(); if (p2 && k >= p2.from) return { table: ALLOC2_VER, tseq: k - p2.from + 1 };
+  return { table: ALLOC_VER, tseq: k };
+}
+function parseAllocN(text, total){
+  const lines = text.replace(/^﻿/, "").split(/\r?\n/).filter(l => l.trim() !== "");
+  const head = lines[0].split(",").map(x => x.trim());
+  if (head.join(",") !== "seq,condition,template") throw new Error(`첫 줄이 seq,condition,template 이 아닙니다 (${head.join(",")})`);
+  const rows = lines.slice(1).map((l, i) => { const [a, c, t] = l.split(",").map(x => x.trim());
+    if (!/^\d+$/.test(a) || Number(a) !== i + 1) throw new Error(`${i + 2}번째 줄: seq가 ${i + 1}이어야 합니다 (${a})`);
+    if (!(c in ALLOC_CODE)) throw new Error(`${i + 2}번째 줄: condition은 E·L·C 중 하나여야 합니다 (${c})`);
+    if (!TEMPLATES.includes(t)) throw new Error(`${i + 2}번째 줄: template이 6개 중 하나가 아닙니다 (${t})`);
+    return { seq: i + 1, code: c, condition: ALLOC_CODE[c], template: t }; });
+  if (rows.length !== total) throw new Error(`행 수가 ${total}이 아닙니다 (${rows.length})`);
+  return rows;
+}
+let A2PEND = null;
+$('f-alloc2').onchange = async e => {
+  const file = e.target.files[0]; A2PEND = null; $('b-alloc2').disabled = true; if (!file) return;
+  const buf = await file.arrayBuffer(), sha = await sha256Hex(buf);
+  if (sha !== ALLOC2_SHA) return msg('alloc2-msg', "err", `SHA-256이 v4.2 보고서의 배정표와 다릅니다. 올리지 않습니다.\n파일: ${sha}\n기준: ${ALLOC2_SHA}`);
+  try { const rows = parseAllocN(new TextDecoder("utf-8").decode(buf), ALLOC2_ROWS);
+    const cnt = c => rows.filter(r => r.code === c).length;
+    if (["E","L","C"].some(c => cnt(c) !== ALLOC2_CNT[c])) throw new Error(`조건 수가 E120·L120·C60이 아닙니다 (E ${cnt("E")} · L ${cnt("L")} · C ${cnt("C")})`);
+    A2PEND = { rows, sha, name: file.name };
+    const n = ALLOC ? Number(ALLOC.n) || 0 : 0;
+    msg('alloc2-msg', "ok", `해시 일치, 형식 검사 통과 (${rows.length}행 · E 120 · L 120 · C 60). 지금 기준으로 seq ${n + 1}부터 v4.2 1행이 붙습니다(누르는 순간의 n으로 다시 확인). '검사 후 이어 붙이기'를 누르세요.`);
+    $('b-alloc2').disabled = !ALLOC || !!phase2(); }
+  catch (err) { msg('alloc2-msg', "err", "검사 실패: " + err.message); }
+};
+$('b-alloc2').onclick = async () => {
+  if (!A2PEND || !ALLOC) return;
+  if (phase2()) return msg('alloc2-msg', "err", "이미 v4.2를 이어 붙였습니다. 다시 할 수 없습니다.");
+  if (!confirm(`v4.2 배정표 300행을 지금 사용한 마지막 seq 다음부터 이어 붙입니다. 이미 쓴 seq는 v3 그대로 남고, 이 작업은 되돌릴 수 없습니다. 계속할까요?`)) return;
+  const btn = $('b-alloc2'); btn.disabled = true; btn.textContent = "이어 붙이는 중…";
+  try {
+    const aref = doc(db, "meta", "alloc"), rows = A2PEND.rows, sha = A2PEND.sha, name = A2PEND.name, by = auth.currentUser.uid;
+    // 한 트랜잭션: 그 순간의 n을 읽고 n+1~n+300 행 + 배정 상태를 함께 저장(참가자 배정과 겹치면 Firestore가 다시 실행)
+    const from = await runTransaction(db, async tx => {
+      const cur = await tx.get(aref);
+      if (!cur.exists()) throw Object.assign(new Error("no_alloc"), { code: "no_alloc" });
+      const a = cur.data();
+      if ((a.phases || []).some(x => x.ver === ALLOC2_VER)) throw Object.assign(new Error("already"), { code: "already" });
+      if (a.sha !== ALLOC_SHA) throw Object.assign(new Error("v3_sha"), { code: "v3_sha" });
+      const n = Number(a.n) || 0, f = n + 1;
+      for (const r of rows) tx.set(doc(db, "alloc", String(n + r.seq)), { seq: n + r.seq, condition: r.condition, template: r.template, code: r.code, ver: ALLOC2_VER, tseq: r.seq });
+      tx.update(aref, { total: n + ALLOC2_ROWS, max_total: n + ALLOC2_ROWS,
+        phases: [{ ver: ALLOC_VER, sha: a.sha, file: a.file_name || "", from: 1, to: n, total_rows: Number(a.total) || ALLOC_TOTAL },
+                 { ver: ALLOC2_VER, sha, file: name, from: f, to: n + ALLOC2_ROWS, n_at_switch: n, at: serverTimestamp(), by }] });
+      return f;
+    });
+    // 다시 읽어 대조
+    let bad = 0;
+    for (const r of rows) { const g = await getDoc(doc(db, "alloc", String(from - 1 + r.seq))); const x = g.exists() ? g.data() : null;
+      if (!x || x.condition !== r.condition || x.template !== r.template || x.ver !== ALLOC2_VER || x.tseq !== r.seq) bad++; }
+    msg('alloc2-msg', bad ? "err" : "ok", bad ? `이어 붙였지만 서버 대조 불일치 ${bad}건이 있습니다. 화면을 캡처해 알려 주세요.`
+      : `이어 붙이기 완료: seq ${from}~${from + ALLOC2_ROWS - 1} = v4.2 1~${ALLOC2_ROWS}행, 서버 대조 ${ALLOC2_ROWS}행 모두 일치. SHA-256 ${sha} 기록.`);
+    await loadAlloc(); render();
+  } catch (e) {
+    msg('alloc2-msg', "err", e.code === "already" ? "이미 v4.2를 이어 붙였습니다." : e.code === "no_alloc" ? "v3 배정표가 서버에 없습니다." : e.code === "v3_sha" ? "서버의 v3 배정표 확인값이 기준과 달라 멈췄습니다." : `이어 붙이지 못했습니다 (${e.code || e.message}).`);
+  } finally { btn.textContent = "검사 후 이어 붙이기"; btn.disabled = !A2PEND || !!phase2(); }
+};
+$('b-cap').onclick = async () => {
+  const p2 = phase2(); if (!p2) return msg('alloc2-msg', "err", "v4.2를 먼저 이어 붙여야 합니다.");
+  const m = Number($('i-cap').value);
+  if (!Number.isInteger(m) || m < 1 || m > ALLOC2_ROWS) return msg('alloc2-msg', "err", `1~${ALLOC2_ROWS} 사이의 정수를 넣어 주세요.`);
+  if (!confirm(`v4.2 구간의 새 seq를 ${m}개까지만 발급합니다(seq ${p2.from}~${p2.from + m - 1}). 그 뒤에는 미완료 seq 재발급만 합니다. 저장할까요?`)) return;
+  try {
+    const aref = doc(db, "meta", "alloc");
+    const res = await runTransaction(db, async tx => {
+      const a = (await tx.get(aref)).data(), n = Number(a.n) || 0, total = p2.from - 1 + m;
+      if (total < n) throw Object.assign(new Error("below_n"), { code: "below_n", n });
+      tx.update(aref, { total, cap_v42: m, cap_at: serverTimestamp() }); return { total, n };
+    });
+    msg('alloc2-msg', "ok", `마감 인원 저장: v4.2 ${m}명(seq ${p2.from}~${res.total}). ${m % 30 === 0 ? "30의 배수라 템플릿까지 완전 균형입니다." : m % 5 === 0 ? "5의 배수라 정확히 2:2:1입니다." : "5의 배수가 아니면 조건 인원이 2:2:1에서 최대 0.8명 벗어납니다."}`);
+    await loadAlloc(); render();
+  } catch (e) { msg('alloc2-msg', "err", e.code === "below_n" ? `이미 seq ${e.n}까지 발급되어 그보다 작게 정할 수 없습니다.` : `저장하지 못했습니다 (${e.code || e.message}).`); }
+};
 async function loadAlloc(){
   try {
     const [a, lg, vs] = await Promise.all([getDoc(doc(db, "meta", "alloc")), getDocs(collection(db, "alloc_log")), getDocs(collection(db, "visits"))]);
@@ -417,12 +510,20 @@ async function loadAlloc(){
     const ks = Object.keys(slots).map(Number).filter(k => k >= 1).sort((x, y) => x - y);
     const done = ks.filter(k => slots[k].d), running = ks.filter(k => !slots[k].d && now - tsMs(slots[k].t) <= limit), free = ks.filter(k => !slots[k].d && now - tsMs(slots[k].t) > limit);
     const re = ALOG.filter(x => x.type === "reissue").length;
+    const p2 = phase2();
+    const seg = (lo, hi) => { const ds = done.filter(k => k >= lo && k <= hi), c = { early: 0, late: 0, control: 0 };
+      ds.forEach(k => { const s = SESS.find(x => x.uid === slots[k].u); if (s && c[s.condition] !== undefined) c[s.condition]++; }); return `완료 ${ds.length} (E ${c.early} · L ${c.late} · C ${c.control})`; };
     $('seq-info').innerHTML = `사용한 seq <b>${n}</b> / ${ALLOC.total} · 완료 <b>${done.length}</b> · 진행 중 ${running.length} · 재발급 대기 ${free.length} · 지금까지 재발급 ${re}회` +
-      (n >= ALLOC.total && !free.length ? ` · <span class="flag">모집 마감(새 배정 없음)</span>` : "");
+      (n >= ALLOC.total && !free.length ? ` · <span class="flag">모집 마감(새 배정 없음)</span>` : "") +
+      (p2 ? `<br><b>배정표 구간</b>: v3 = seq 1~${p2.from - 1} · ${seg(1, p2.from - 1)} / v4.2 = seq ${p2.from}~${p2.to} (v4.2 n번째 행 = seq − ${p2.from - 1}) · ${seg(p2.from, p2.to)}` +
+        ` · 이어 붙인 시각 ${esc(tsKo(p2.at))}` + (ALLOC.cap_v42 ? ` · <b>마감 인원 v4.2 ${ALLOC.cap_v42}명</b>(seq ${ALLOC.total}까지 새 발급)` : "") : "");
+    $('b-cap').disabled = !p2; $('b-alloc2').disabled = !A2PEND || !!p2;
+    $('v42-state').innerHTML = p2 ? `<b>이어 붙임 완료</b>: seq ${p2.from}부터 v4.2 (${esc(p2.file)}, SHA ${esc(String(p2.sha).slice(0, 8))}…). 다시 이어 붙일 수 없습니다.` : "아직 이어 붙이지 않았습니다(지금은 v3만 사용).";
   } catch (e) { $('alloc-state').textContent = `배정표 상태를 불러오지 못했습니다 (${e.code || e.message}).`; }
 }
 $('b-alloc-testreset').onclick = async () => {
   if (!ALLOC) return msg('alloc-msg', "info", "배정표가 아직 없습니다.");
+  if (phase2()) return msg('alloc-msg', "err", "v4.2를 이어 붙인 뒤에는 되돌리기를 쓸 수 없습니다.");
   const who = ALLOC.who || {}, uids = Object.keys(who);
   const mainS = SESS.filter(isMain), mainP = PARTS.filter(isMain);
   const real = mainS.filter(s => !isTest(s.pid)).length + mainP.filter(p => !isTest(p.pid)).length + uids.filter(u => !mainS.some(s => s.uid === u)).length;
@@ -643,9 +744,9 @@ $('b-dl-trials').onclick = async () => {
   finally { btn.disabled = false; btn.textContent = "회차 자료(trials_long) CSV"; }
 };
 $('b-dl-sess').onclick = () => {
-  const cols = ["uid","pid","phone","phase","seq","alloc","slot","cell","condition","template","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
+  const cols = ["uid","pid","phone","phase","seq","alloc","alloc_table","table_seq","slot","cell","condition","template","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
   save(`sessions_${stampNow()}.csv`, cols, visibleSess().map(s => { const { n, status } = sessStatus(s);
-    return { ...s, phase: isMain(s) ? "main" : "pilot", phone: (partOf(s) || {}).phone || "", created_at: tsIso(s.created_at), trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
+    return { ...s, alloc_table: isMain(s) ? tableOf(s.seq).table : "", table_seq: isMain(s) ? tableOf(s.seq).tseq : "", phase: isMain(s) ? "main" : "pilot", phone: (partOf(s) || {}).phone || "", created_at: tsIso(s.created_at), trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
 };
 $('b-dl-sum').onclick = () => {
   const rows = visibleParts(); if (!rows.length) return;
@@ -661,7 +762,7 @@ $('b-dl-ev').onclick = () => {
   const a = document.createElement('a'); a.href = url; a.download = `events_all_${stampNow()}.csv`; document.body.appendChild(a); a.click(); a.remove();
 };
 /* ====================== 전체(total) CSV ====================== */
-const SESS_COLS = ["uid","pid","phone","phase","seq","alloc","slot","cell","condition","template","assign_reused","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","stim_sha",
+const SESS_COLS = ["uid","pid","phone","phase","seq","alloc","alloc_table","table_seq","slot","cell","condition","template","assign_reused","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","stim_sha",
   "visit_ts_server","created_at","finished_ts_server","dur_server_s","assign_to_finish_s","session_status","trials_done","finished","T0","rt_T0","ts_T0"];
 const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0"].includes(c));
 function parseEvents(csv){
@@ -691,7 +792,7 @@ function totalRows(){
   const rows = [], usedParts = new Set();
   const sesRec = s => { const { n, status } = sessStatus(s), p = partOf(s) || {}, v = VISITS[s.uid] || {};
     const vt = tsMs(v.ts), at = tsMs(s.created_at), ft = tsMs(p.created_at);
-    return { uid: s.uid, pid: s.pid, phone: p.phone || "", phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", alloc: s.alloc ?? "", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition, template: s.template,
+    return { uid: s.uid, pid: s.pid, phone: p.phone || "", phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", alloc: s.alloc ?? "", alloc_table: isMain(s) ? tableOf(s.seq).table : "", table_seq: isMain(s) ? tableOf(s.seq).tseq : "", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition, template: s.template,
     assign_reused: s.assign_reused, app_version: s.app_version, device: s.device, os_name: s.os_name ?? "", browser: s.browser ?? "", screen_w: s.screen_w ?? "", screen_h: s.screen_h ?? "", orientation: s.orientation ?? "",
     view: s.view ?? "", comp_passed: s.comp_passed ?? "", stim_sha: s.stim_sha ?? "",
     visit_ts_server: tsIso(v.ts), created_at: tsIso(s.created_at), finished_ts_server: tsIso(p.created_at),
@@ -733,7 +834,7 @@ $('b-dl-total').onclick = async () => {
 /* 열 설명(코드북) */
 const CB = Object.assign({}, {
   participant_doc: "결과 문서 ID(끝까지 마친 참가자)", has_summary: "설문·요약 있음(1)=끝까지 마침", uid: "참가자 고유 ID(파일 간 연결 열)", pid: "휴대전화 뒷자리", phone: "전화번호",
-  phase: "main=본실험(v3 배정표), pilot=파일럿(이전 18칸 순차 배정)", seq: "본실험 배정표 순번(1~300)", alloc: "배정표 버전(v3)", slot: "배정 순번(본실험은 seq와 같음, 파일럿은 이전 순번)", cell: "파일럿 18칸 중 위치(0~17)",
+  phase: "main=본실험(고정 배정표: v3, v4.2 이어 붙임 포함), pilot=파일럿(이전 18칸 순차 배정)", seq: "본실험 배정 순번(서버 전체 순번). v4.2 이어 붙인 뒤에는 1~n이 v3, n+1부터 v4.2", alloc: "배정 방식 표기(고정 배정표 방식 = v3 라벨, 실제 사용 표는 alloc_table)", alloc_table: "그 seq의 조건·템플릿을 정한 배정표: v3(E:L:C = 9:9:7, SHA 67ca9426…) 또는 v4.2(2:2:1, SHA b6e5b7af…, seed 20261122). 서버 meta/alloc.phases 기준", table_seq: "그 배정표 안의 행 번호(v3는 seq와 같음, v4.2는 seq − 이어 붙인 시점의 n). v4.2의 정지 시점별 균형은 이 번호 기준", slot: "배정 순번(본실험은 seq와 같음, 파일럿은 이전 순번)", cell: "파일럿 18칸 중 위치(0~17)",
   os_name: "운영체제(windows/macos/ios/android/chromeos/linux)", browser: "브라우저", screen_w: "화면 폭(px)", screen_h: "화면 높이(px)", orientation: "배정 시 화면 방향(portrait/landscape)",
   visit_ts_server: "첫 방문 시각(서버, UTC)", finished_ts_server: "결과 저장 시각(서버, UTC)", dur_server_s: "총 소요시간(초, 서버 기준: 첫 방문~결과 저장)", assign_to_finish_s: "배정~결과 저장(초, 서버 기준)", condition: "조건: early=초기 오류(2·4·7·9회), late=후기 오류(12·14·17·19회), control=무오류", template: "단서 템플릿", assign_reused: "중도 이탈 자리 재배정(1)",
   app_version: "앱 버전", device: "기기(pc/mobile/tablet)", view: "화면 방식(3d/2d/3d_then_2d)", comp_passed: "이해 확인 통과(1)/해설 후 진행(0)", stim_sha: "단서 자료 확인값",
