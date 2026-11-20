@@ -556,7 +556,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.10.2",
+  appVersion: "v8.10.3",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -665,13 +665,13 @@ const PRE_SURVEY = [
 /* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(4 / 4)으로 표시 */
 const DRONE_PRE_SURVEY = [
   { block: "P3", type: "likert", points: 7, intro: "함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
-    leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
+    leftLabel: "1 = 전혀 그렇지 않다", rightLabel: "7 = 매우 그렇다",
     items: [
       { id: "tia_pre_1", text: "이 드론의 경로 선택 기능은 나를 속이려는 것 같다." },
       { id: "tia_pre_2", text: "이 드론의 경로 선택 기능은 정직하지 못한 방식으로 작동하는 것 같다." },
-      { id: "tia_pre_3", text: "나는 이 드론의 경로 선택 기능의 작동 방식이나 결과를 의심하게 된다." },
+      { id: "tia_pre_3", text: "나는 이 드론의 경로 선택 기능의 의도, 작동 방식 또는 응답 결과를 의심하게 된다." },
       { id: "tia_pre_4", text: "나는 이 드론의 경로 선택 기능을 경계하게 된다." },
-      { id: "tia_pre_5", text: "이 드론의 경로 선택 기능은 해롭거나 위험한 결과를 초래할 것이다." },
+      { id: "tia_pre_5", text: "이 드론의 경로 선택 기능의 작동은 해롭거나 위험한 결과를 초래할 것이다." },
       { id: "tia_pre_6", text: "나는 이 드론의 경로 선택 기능에 대해 확신을 가진다." },
       { id: "tia_pre_7", text: "이 드론의 경로 선택 기능은 보안성을 제공한다." },
       { id: "tia_pre_8", text: "이 드론의 경로 선택 기능은 정직하다." },
@@ -702,13 +702,13 @@ const POST_SURVEY = [
   { block: "TP", type: "slider100", suffix: "", leftLabel: TRUST_LEFT, rightLabel: TRUST_RIGHT, items: [
       { id: "trust_post", text: TRUST_QP } ] },
   { block: "A", type: "likert", points: 7, intro: "지금까지 함께한 경로를 선택하는 드론(AI 기반 자동화 시스템)에 대해 각 문장이 얼마나 해당하는지 선택해 주세요.",
-    leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
+    leftLabel: "1 = 전혀 그렇지 않다", rightLabel: "7 = 매우 그렇다",
     items: [
       { id: "tia_1", text: "이 드론의 경로 선택 기능은 나를 속이려는 것 같다." },
       { id: "tia_2", text: "이 드론의 경로 선택 기능은 정직하지 못한 방식으로 작동하는 것 같다." },
-      { id: "tia_3", text: "나는 이 드론의 경로 선택 기능의 작동 방식이나 결과를 의심하게 된다." },
+      { id: "tia_3", text: "나는 이 드론의 경로 선택 기능의 의도, 작동 방식 또는 응답 결과를 의심하게 된다." },
       { id: "tia_4", text: "나는 이 드론의 경로 선택 기능을 경계하게 된다." },
-      { id: "tia_5", text: "이 드론의 경로 선택 기능은 해롭거나 위험한 결과를 초래할 것이다." },
+      { id: "tia_5", text: "이 드론의 경로 선택 기능의 작동은 해롭거나 위험한 결과를 초래할 것이다." },
       { id: "tia_6", text: "나는 이 드론의 경로 선택 기능에 대해 확신을 가진다." },
       { id: "tia_7", text: "이 드론의 경로 선택 기능은 보안성을 제공한다." },
       { id: "tia_8", text: "이 드론의 경로 선택 기능은 정직하다." },
