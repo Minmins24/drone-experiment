@@ -624,7 +624,8 @@ const LBL = {
   age_group: { "10s": "10대", "20s": "20대", "30s": "30대", "40s": "40대", "50s": "50대", "60s": "60대 이상" },
   gender: { male: "남성", female: "여성", na: "응답 안 함" },
   exp_drone: { never: "① 경험 없음", media: "② 매체로 관찰", onsite: "③ 현장 관찰", piloted: "④ 직접 조종", yes: "예(v8.7 이전)", no: "아니오(v8.7 이전)", none: "없음(이전 문항)", few: "1~2번(이전 문항)", many: "여러 번(이전 문항)" },
-  ai_knowledge: { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" },   // 선택지 문구가 버전마다 달라 숫자로만 표시(코드북 참고)
+  ai_knowledge: { 1: "1", 2: "2", 3: "3", 4: "4", 5: "5" },
+  ai_knowledge_10: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, String(i + 1)])),   // 선택지 문구가 버전마다 달라 숫자로만 표시(코드북 참고)
   edu: { middle_or_less: "중학교 졸업 이하", high: "고등학교 졸업", college: "대학교 졸업", grad: "대학원 재학 이상" },
   mc_error_noticed: { yes: "있었다", no: "없었다", unsure: "잘 모르겠다" },
   memo_used: { yes: "예", no: "아니오" }
@@ -639,7 +640,7 @@ const TIA_ITEM = ["R 속이려는 것 같다", "R 정직하지 못한 방식", "
 TIA_ITEM.forEach((t, i) => { ITEM["tia_pre_" + (i + 1)] = t; ITEM["tia_" + (i + 1)] = t; });
 MAILS_ITEM.forEach((t, i) => { ITEM["mails_" + (i + 1)] = t; });
 const GROUPS = [
-  ["참가자 정보", k => ["pid","phone","age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge"].includes(k)],
+  ["참가자 정보", k => ["pid","phone","age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge","ai_knowledge_10"].includes(k)],
   ["배정·기기", k => ["uid","slot","cell","condition","template","assign_reused","device","os","inapp","screen","view","three_src","gl_lost","hidden_n","ua","app_version","stim_sha","total_time_s","resumed_n","notes"].includes(k)],
   ["자동화 성향적 신뢰 (1~5점, R=역채점)", k => /^ptt_/.test(k)],
   ["AI 태도 (1~5점, R=역채점)", k => /^ai_/.test(k)],
@@ -656,7 +657,7 @@ const GROUPS = [
 ];
 const KEYLBL = { ptt_mean: "평균(역채점 반영)", ai_mean: "평균(역채점 반영)", ai_pos_mean: "긍정 6문항 평균", ai_neg_mean: "부정 6문항 평균(원점수)", ait_mean: "AI 기술적 이해 평균(14문항)", mails_mean: "평균(0~10)",
   tia_pre_mean: "평균(역채점 반영)", tia_pre_distrust_mean: "불신 5문항 평균(원점수)", tia_pre_trust_mean: "신뢰 6문항 평균", tia_mean: "평균(역채점 반영)", tia_distrust_mean: "불신 5문항 평균(원점수)", tia_trust_mean: "신뢰 6문항 평균",
-  age: "만 나이", age_group: "연령대", gender: "성별", edu: "최종 학력", exp_drone: "드론 이전 경험. v8.7.0부터 문항 '드론에 대한 이전 경험을 선택해 주세요.'(여러 항목에 해당하면 가장 큰 번호 하나): never=① 비행 관찰·조종 경험 없음, media=② 매체를 통한 비행 관찰만 있음, onsite=③ 현장에서 비행을 관찰한 경험 있음, piloted=④ 드론을 직접 조종한 경험 있음(순서형 1~4로 쓸 때 never=1 … piloted=4). 그 이전 기록: yes/no(v8.5.8~v8.6.3 '드론을 직접 조종해 본 적이 있습니까?', 그 전 '과거에 드론을 조작해 본 적이 있으십니까?'), v8.1 이전 none/few/many. 비교할 때 yes≈piloted, no≈never·media·onsite — app_version으로 구분", ai_use_freq: "AI 제품·서비스 사용 빈도(1=전혀 사용하지 않는다 ~ 7=매우 자주 사용한다)", ai_knowledge: "AI 기술과 그 전반적인 능력·한계·필요 조건·활용에 대해 알고 있는 정도(1~5). v8.9.1부터: 1=전혀 알지 못한다, 2=별로 알지 못한다, 3=중간 정도 안다, 4=많이 안다, 5=매우 많이 안다. v8.9.0(잠깐): 4=꽤 알고 있다, 5=많이 알고 있다(1~3은 뜻 같음). v8.7.0까지: 1=별로 알지 못한다, 2=조금 알고 있다, 3=중간 정도 알고 있다, 4=많이 알고 있다, 5=매우 많이 알고 있다(그 이전 버전은 문구가 또 다름). v8.7.1~v8.8.6 참여자는 문항이 없어 빈칸 — 버전 간 문구가 달라 합쳐 분석할 때 주의, app_version으로 구분", phone: "전화번호", pid: "뒷자리",
+  age: "만 나이", age_group: "연령대", gender: "성별", edu: "최종 학력", exp_drone: "드론 이전 경험. v8.7.0부터 문항 '드론에 대한 이전 경험을 선택해 주세요.'(여러 항목에 해당하면 가장 큰 번호 하나): never=① 비행 관찰·조종 경험 없음, media=② 매체를 통한 비행 관찰만 있음, onsite=③ 현장에서 비행을 관찰한 경험 있음, piloted=④ 드론을 직접 조종한 경험 있음(순서형 1~4로 쓸 때 never=1 … piloted=4). 그 이전 기록: yes/no(v8.5.8~v8.6.3 '드론을 직접 조종해 본 적이 있습니까?', 그 전 '과거에 드론을 조작해 본 적이 있으십니까?'), v8.1 이전 none/few/many. 비교할 때 yes≈piloted, no≈never·media·onsite — app_version으로 구분", ai_use_freq: "AI 제품·서비스 사용 빈도(1=전혀 사용하지 않는다 ~ 7=매우 자주 사용한다)", ai_knowledge: "AI 기술과 그 전반적인 능력·한계·필요 조건·활용에 대해 알고 있는 정도(1~5). v8.9.1부터: 1=전혀 알지 못한다, 2=별로 알지 못한다, 3=중간 정도 안다, 4=많이 안다, 5=매우 많이 안다. v8.9.0(잠깐): 4=꽤 알고 있다, 5=많이 알고 있다(1~3은 뜻 같음). v8.7.0까지: 1=별로 알지 못한다, 2=조금 알고 있다, 3=중간 정도 알고 있다, 4=많이 알고 있다, 5=매우 많이 알고 있다(그 이전 버전은 문구가 또 다름). v8.7.1~v8.8.6 참여자는 문항이 없어 빈칸 — 버전 간 문구가 달라 합쳐 분석할 때 주의, app_version으로 구분. v8.10.0부터는 이 문항 대신 ai_knowledge_10(1~10점)을 물어 빈칸", ai_knowledge_10: "v8.10.0부터: '인공지능(AI)에 대한 나의 지식과 이해는:' 1~10점(1=매우 낮음, 10=매우 높음). 그 이전 참여자는 빈칸(이전 5단계 문항은 ai_knowledge 열)", phone: "전화번호", pid: "뒷자리",
   comp_attempts: "시도 횟수", comp_score_1: "1차 맞힌 수(4문항)", comp_score_2: "2차 맞힌 수", comp_passed: "통과(1)·미통과(0)", comp_reviewed: "정답·해설 확인",
   T0: "시작 전 신뢰", trials_done: "완료 회차", A_rate: "위임률(전체)", A_rate_1_10: "위임률 1~10회", A_rate_11_20: "위임률 11~20회", T_mean: "신뢰 평균", T_final: "20회차 신뢰",
   H_correct_n: "본인 선택 정답 수", C_correct_n: "실제 선택 정답 수", cum_time: "누적 배송시간(초)", R_real_sum: "실제 손실 합계(초)", rt_H_median: "본인 선택 반응시간 중앙값(ms)", rt_A_median: "맡기기 반응시간 중앙값(ms)", rt_T_median: "신뢰 응답시간 중앙값(ms)",
