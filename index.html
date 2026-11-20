@@ -305,6 +305,10 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
         <button class="opt" data-v="1">1</button><button class="opt" data-v="2">2</button><button class="opt" data-v="3">3</button><button class="opt" data-v="4">4</button><button class="opt" data-v="5">5</button><button class="opt" data-v="6">6</button><button class="opt" data-v="7">7</button>
       </div>
       <div class="scale-ends"><span>1 = 전혀 사용하지 않는다</span><span>7 = 매우 자주 사용한다</span></div></div>
+    <div class="field"><span style="display:block;font-weight:650;margin-bottom:6px">AI 기술과 그 전반적인 능력, 한계, 필요 조건, 활용에 대해 얼마나 알고 있습니까?</span>
+      <div class="opts ordinal" data-name="ai_knowledge">
+        <button class="opt" data-v="1">전혀 알지 못한다</button><button class="opt" data-v="2">별로 알지 못한다</button><button class="opt" data-v="3">중간 정도 알고 있다</button><button class="opt" data-v="4">꽤 알고 있다</button><button class="opt" data-v="5">많이 알고 있다</button>
+      </div></div>
     <div class="field"><span style="display:block;font-weight:650;margin-bottom:2px">드론에 대한 이전 경험을 선택해 주세요.</span>
       <span class="muted" style="display:block;font-size:13px;margin-bottom:8px">여러 항목에 해당하면 번호가 가장 큰 항목 하나를 선택해 주세요.</span>
       <div class="opts col" data-name="exp_drone">
@@ -550,7 +554,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.8.6",
+  appVersion: "v8.9.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -654,20 +658,9 @@ const PRE_SURVEY = [
       { id: "ai_10", text: "AI는 문제를 해결하기보다는 새로운 문제를 발생시키는 경우가 많다." },
       { id: "ai_11", text: "나는 AI에 대해 대체로 긍정적인 감정을 갖고 있다." },
       { id: "ai_12", text: "나는 AI를 기반으로 한 기술을 가급적 사용하지 않으려 한다." }
-    ] },
-  // v8.8.0: AI 관련 능력 자기평가 6문항(0~10점). 실험 전 설문 3쪽(과제 배경 앞)
-  { block: "P4", type: "likert", start: 0, points: 11, intro: "인공지능(AI)에 대한 지식과 이해를 묻습니다. 각 문장에 대해 0~10점 중에서 선택해 주세요.",
-    leftLabel: "0 = 해당 능력이 전혀 없거나 거의 없는 수준임", rightLabel: "10 = 해당 능력이 매우 뛰어나거나 (거의) 완벽한 수준임",
-    items: [
-      { id: "mails_1", text: "나는 '인공지능'이라는 주제의 가장 중요한 개념들을 알고 있다." },
-      { id: "mails_2", text: "나는 인공지능의 정의들을 알고 있다." },
-      { id: "mails_3", text: "나는 한 AI를 사용하는 것의 한계와 기회가 무엇인지 평가할 수 있다." },
-      { id: "mails_4", text: "나는 한 인공지능을 사용하는 것이 어떤 장점과 단점을 수반하는지 평가할 수 있다." },
-      { id: "mails_5", text: "나는 AI의 새로운 용도를 떠올릴 수 있다." },
-      { id: "mails_6", text: "나는 AI의 가능한 미래 용도를 상상할 수 있다." }
     ] }
 ];
-/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(5 / 5)으로 표시 */
+/* 과제 배경 화면 바로 다음: 드론 사전 신뢰 11문항(7점). 실험 전 설문의 마지막 쪽(4 / 4)으로 표시 */
 const DRONE_PRE_SURVEY = [
   { block: "P3", type: "likert", points: 7, intro: "함께할 드론은 경로를 알려주는 AI 기반 자동화 시스템입니다. 드론의 선택을 보기 전인 지금의 생각으로 각 문장이 얼마나 해당하는지 선택해 주세요.",
     leftLabel: "1 = 전혀 아니다", rightLabel: "7 = 매우 그렇다",
@@ -690,7 +683,7 @@ const PRE_RANGE = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].filter
 const PRE_MIN = Object.fromEntries([...PRE_SURVEY, ...DRONE_PRE_SURVEY].filter(b => b.inPre !== false).flatMap(b => b.items.map(it => [it.id, b.start ?? 1])));   // 최솟값(0~10점 척도는 0)
 const MAILS_IDS = ["mails_1","mails_2","mails_3","mails_4","mails_5","mails_6"];
 const PRE_IDS = Object.keys(PRE_RANGE);
-const INFO_KEYS = ["age", "age_group", "gender", "edu", "exp_drone", "ai_use_freq"];   // v8.7.1: ai_knowledge 문항 삭제(요약 열은 빈칸으로 유지)
+const INFO_KEYS = ["age", "age_group", "gender", "edu", "exp_drone", "ai_use_freq", "ai_knowledge"];   // v8.9.0: ai_knowledge 다시 추가(1=전혀 알지 못한다, 2=별로 알지 못한다, 3=중간 정도 알고 있다, 4=꽤 알고 있다, 5=많이 알고 있다). v8.7.1~v8.8.6에는 없었음
 const okInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 function preStatus(sv){   // complete = 사전 원응답 전부 유효 / missing = 하나도 없음 / invalid = 일부만 있거나 범위 밖
   const vals = PRE_IDS.map(id => sv ? sv[id] : undefined);
@@ -700,7 +693,7 @@ function preStatus(sv){   // complete = 사전 원응답 전부 유효 / missing
 function buildPre(){
   const o = Object.fromEntries(PRE_IDS.map(id => [id, S.survey[id]]));
   INFO_KEYS.forEach(k => o[k] = S.info[k] ?? "");
-  ["age", "ai_use_freq"].forEach(k => o[k] = Number(o[k]));
+  ["age", "ai_use_freq", "ai_knowledge"].forEach(k => o[k] = Number(o[k]));
   return o;
 }
 const POST_SURVEY = [
@@ -1425,11 +1418,11 @@ $('b-info').onclick = () => {
   if (!S.info.age_group) return err.textContent = "연령대를 선택해 주세요.";
   { const g = age >= 60 ? "60s" : (Math.floor(age / 10) * 10) + "s";   // 입력한 만 나이와 고른 연령대가 맞는지 확인
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
-  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
+  for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["ai_knowledge","AI 기술에 대해 알고 있는 정도를"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
-  for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq"]) log("survey", { item_id: k, value: S.info[k] });
+  for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge"]) log("survey", { item_id: k, value: S.info[k] });
   setPhase("ai_intro"); show('s-ai-intro');   // v8.6.0: 참가자 정보 다음, 사전 설문 앞에 AI·자동화 시스템 소개
 };
 $('b-ai-intro').onclick = () => {
