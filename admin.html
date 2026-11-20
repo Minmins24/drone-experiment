@@ -358,6 +358,7 @@ async function loadStim(){
 }
 
 /* ====================== 2·3. 배정·기록 ====================== */
+const TCACHE = "drone_admin_trials_v1_" + location.pathname + "_";
 async function loadAll(){
   $('b-reload').disabled = true;
   try {
@@ -365,7 +366,15 @@ async function loadAll(){
     PARTS = ps.docs.map(d => ({ id: d.id, ...d.data() }));
     SESS = ss.docs.map(d => ({ uid: d.id, ...d.data() }));
     $('area').hidden = false; $('rules-help').hidden = true;
-    await Promise.all(SESS.map(async s => { const q = await getDocs(collection(db, "sessions", s.uid, "trials")); TRIALS[s.uid] = {}; q.forEach(d => TRIALS[s.uid][d.id] = d.data()); }));
+    // 완료된 세션의 회차 기록은 더 바뀌지 않으므로 한 번 읽은 것은 이 브라우저에 보관해 다시 읽지 않음(새로고침마다 수천 건 읽기 → 서버 무료 사용량 절약)
+    const done = new Set(PARTS.map(p => p.uid).filter(Boolean)), todo = SESS.filter(s => {
+      if (!(s.finished && done.has(s.uid))) return true;
+      if (TRIALS[s.uid] && Object.keys(TRIALS[s.uid]).length) return false;
+      try { const c = JSON.parse(localStorage.getItem(TCACHE + s.uid) || "null"); if (c && c.v === 1 && c.n >= 1) { TRIALS[s.uid] = c.t; return false; } } catch (_) {}
+      return true; });
+    for (let i = 0; i < todo.length; i += 25) await Promise.all(todo.slice(i, i + 25).map(async s => {   // 25개씩 나눠 읽기(한꺼번에 수백 건 요청 방지)
+      const q = await getDocs(collection(db, "sessions", s.uid, "trials")); const t = {}; q.forEach(d => t[d.id] = d.data()); TRIALS[s.uid] = t;
+      if (s.finished && done.has(s.uid) && q.size) { try { localStorage.setItem(TCACHE + s.uid, JSON.stringify({ v: 1, n: q.size, t })); } catch (_) {} } }));
     loadStim(); await loadAlloc(); render();
   } catch (e) {
     if (e.code === "permission-denied") { $('rules-help').hidden = false; }

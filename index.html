@@ -556,7 +556,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.10.3",
+  appVersion: "v8.11.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -835,14 +835,14 @@ function makeFirebaseBackend(){
     async assign(base){
       const sref = d("sessions", api.uid), aref = d("meta", "alloc");
       const ex = await F.fs.getDoc(sref); if (ex.exists()) return ex.data();
-      const claim = noReuse => F.fs.runTransaction(F.db, async tx => {
+      const claim = noReuse => F.fs.runTransaction(F.db, async tx => {   // 동시 배정이 몰리면 Firestore가 트랜잭션을 다시 실행(최대 10번)
         const snap = await tx.get(aref);
         if (!snap.exists()) throw Object.assign(new Error("alloc_missing"), { code: "alloc_missing" });
         const p = allocPlan(snap.data(), api.uid, Date.now(), noReuse);
         if (p.closed) throw Object.assign(new Error("closed"), { code: "closed" });
         if (!p.existing) tx.update(aref, { n: p.n, [`slots.${p.k}`]: { t: F.fs.serverTimestamp(), d: false, r: p.r, u: api.uid }, [`who.${api.uid}`]: p.k });
         return p;
-      });
+      }, { maxAttempts: 10 });
       let p;
       try { p = await claim(false); }
       catch (e) { if (e && e.code === "permission-denied") p = await claim(true); else throw e; }   // 기기 시계가 크게 틀려 재발급 판단이 서버와 다를 때: 새 seq로
@@ -1178,7 +1178,12 @@ function sceneOff(){ document.body.classList.remove('gl-on'); $('fade').classLis
 function panelTo(id){ try { $(id).scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
 
 /* 네트워크 호출: 실패하면 화면 아래에 '다시 시도'를 띄우고, 성공할 때까지 같은 단계에 머무름 (결과 재추첨 없음) */
+/* v8.11.0: 동시 접속이 몰릴 때 서버가 잠깐 내는 오류(경합·일시 장애·시간 초과)는 참가자에게 보이지 않게
+   자동으로 다시 시도(점점 길게, 무작위로 흩어서). 그래도 안 되면 안내 창을 띄우되, 창이 떠 있어도 20초마다 스스로 다시 시도. */
+const TRANSIENT_RE = /aborted|unavailable|deadline|resource-exhausted|internal|timeout|failed-precondition|cancelled|unknown|network|offline|fetch|too-many-requests|quota-exceeded/i;
+const SILENT_TRIES = 6;   // 약 0.8·1.6·3.2·6.4·12·15초(±40%) → 최대 약 40초 동안 조용히 재시도
 async function net(label, fn, opts = {}){
+  let silent = 0;
   for (let attempt = 1; ; attempt++) {
     try { return await withTimeout(fn(), opts.timeout || 20000); }
     catch (e) {
@@ -1186,15 +1191,22 @@ async function net(label, fn, opts = {}){
       log("net_error", { step: label, note: String(code).slice(0, 120) });
       if (opts.recover) { try { const r = await opts.recover(e); if (r !== undefined) return r; } catch (_) {} }
       if (opts.fatal && opts.fatal(code)) throw e;
-      $('net-text').textContent = (code === "permission-denied"
+      const transient = TRANSIENT_RE.test(String(code));
+      // 일시 오류이거나, 처음 한 번의 거부(예: 같은 순간 다른 참가자의 변경과 겹침)는 조용히 다시 시도
+      if ((transient && silent < SILENT_TRIES) || (code === "permission-denied" && silent < 1)) {
+        silent++; await sleep(Math.min(15000, 800 * 2 ** (silent - 1)) * (0.6 + Math.random() * 0.8)); continue;
+      }
+      $('net-text').textContent = (/too-many-requests|quota-exceeded/.test(String(code))
+        ? `같은 와이파이·인터넷에서 동시에 접속한 사람이 많아 서버가 잠시 접속을 막았습니다. ${IS_MOBILE() ? "와이파이를 끄고 모바일 데이터로 바꾼 뒤 " : "잠시 기다린 뒤 "}'다시 시도'를 눌러 주세요. 입력한 내용은 그대로 남아 있습니다.`
+        : code === "permission-denied"
         ? "서버가 이 요청을 거부했습니다. 다시 시도해도 계속되면 이 화면을 캡처해 실험자에게 알려 주세요."
         : label === "init" && attempt >= 2
           ? `실험 서버에 연결하지 못했습니다. ${IS_MOBILE() ? "와이파이·데이터" : "인터넷"} 연결을 확인하고, 메신저·앱 안이 아닌 ${DEV.recLong}에서 실험 주소(${CONFIG.officialUrl})로 열어 주세요.`
           : "연결이 원활하지 않습니다. 입력한 내용은 그대로 남아 있습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")
         + ` (오류: ${String(code).slice(0, 60)})`;
       $('net').hidden = false;
-      await new Promise(res => { $('b-net').onclick = res; window.addEventListener('online', res, { once: true }); });
-      $('net').hidden = true;
+      await new Promise(res => { $('b-net').onclick = res; window.addEventListener('online', res, { once: true }); if (transient) setTimeout(res, 20000 + Math.random() * 5000); });
+      $('net').hidden = true; silent = Math.max(0, SILENT_TRIES - 2);   // 창이 닫힌 뒤에도 두 번은 조용히 더 시도
     }
   }
 }
@@ -1905,11 +1917,20 @@ function baseRecord(condOverride){
     trials: { name: S.finishId + "_trials.csv", text: toCSV(rows, TR_COLS) },
     events: { name: S.finishId + "_events.csv", text: toCSV(S.events, EV_COLS) }
   };
+  // 서버 문서 한도(1MiB) 보호: 사건 기록이 지나치게 길면(연결 오류 반복 등) 서버 사본만 처음·마지막 부분을 남김(파일 보내기용 전체 기록은 그대로)
+  const bytes = x => new TextEncoder().encode(x).length;
+  let evServer = FILES.events.text;
+  if (bytes(evServer) + bytes(FILES.trials.text) > 700000) {
+    const ev = S.events, keep = ev.filter(e => e.event_type !== "net_error" && e.event_type !== "visibility");
+    let cut = keep.length > 1500 ? keep.slice(0, 300).concat(keep.slice(-1000)) : keep;
+    evServer = toCSV(cut, EV_COLS); if (bytes(evServer) > 600000) evServer = toCSV(cut.slice(-800), EV_COLS);
+    log("error", { note: `events_trimmed_for_server ${ev.length}->${cut.length}` });
+  }
   const s = S.session || {};
   return { id: S.uid ? "s_" + S.uid : S.finishId, slot: s.slot ?? null, seq: s.seq ?? null, summary,   // 결과 문서 이름 = 세션마다 하나(새로고침·중복 클릭·두 탭에도 결과 1개)
     doc: Object.assign(s.seq != null ? { seq: s.seq, alloc: s.alloc } : {}, { pid: S.pid, phone: clean(S.info.phone), uid: S.uid, slot: s.seq ?? s.slot ?? 0, condition: condOverride || s.condition, template: s.template || "",
       app_version: CONFIG.appVersion, summary: sumClean, summary_cols: SUM_COLS, trials_cols: TR_COLS, trials_csv: FILES.trials.text,
-      events_cols: EV_COLS, events_csv: FILES.events.text }) };
+      events_cols: EV_COLS, events_csv: evServer }) };
 }
 async function finish(){
   S.phase = "end"; log("page", { note: "end" });
@@ -1951,12 +1972,13 @@ async function finish(){
     } else {
       $('retry-row').hidden = false;
       st.className = "status fail"; tx.textContent = "아직 저장되지 않았습니다. 이 창을 열어 두면 자동으로 다시 보냅니다. '다시 보내기'를 누르거나, 자동 저장이 되지 않을 때에는 아래 버튼으로 결과 파일을 보내 주세요.";
-      if (tries >= 60) clearInterval(timer);
+      if (tries === 40) { clearInterval(timer); timer = setInterval(attempt, 60000); }   // 10분이 지나면 1분 간격으로, 창이 열려 있는 동안 계속
     }
   };
   $('b-retry').onclick = attempt;
   window.addEventListener('online', attempt);
-  const timer = setInterval(attempt, 15000);
+  let timer = setInterval(attempt, 15000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') attempt(); });   // 다른 앱을 갔다 돌아오면 바로 다시 보냄
   await attempt();
 }
 function fileList(){ return [FILES.summary, FILES.trials, FILES.events]; }
