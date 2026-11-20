@@ -556,7 +556,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.10.1",
+  appVersion: "v8.10.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -633,7 +633,7 @@ const AI_N = 12, AI_REVERSE = ["ai_2", "ai_4", "ai_7", "ai_8", "ai_10", "ai_12"]
 const TIA_N = 11, TIA_DISTRUST = [1, 2, 3, 4, 5];
 const PRE_SURVEY = [
   { block: "P1", type: "likert", points: 5, intro: "자동화 시스템에 대한 평소 생각을 묻습니다. 각 문장에 얼마나 동의하는지 선택해 주세요.",
-    leftLabel: "1 = 전혀 아니다", rightLabel: "5 = 매우 그렇다",
+    leftLabel: "1 = 전혀 동의하지 않는다", rightLabel: "5 = 매우 동의한다",
     items: [
       { id: "ptt_1", text: "자동화된 기술 시스템을 신뢰했다가 때로는 좋지 않은 결과를 겪을 수 있더라도,\n나는 여전히 이러한 시스템을 신뢰하지 않는 것보다 신뢰하는 쪽을 선호한다." },
       { id: "ptt_2", text: "나는 불확실성을 감당할 수 없어서 자동화된 기술 시스템을 좀처럼 신뢰하지 않는다." },
@@ -646,13 +646,13 @@ const PRE_SURVEY = [
   { block: "C", type: "likert", points: 7, inPre: false, leftLabel: "1", rightLabel: "7", items: [
       { id: "attn_1", text: "성실한 응답 확인을 위한 문항입니다. 이 문항에서는 \"3\"을 선택해 주세요." } ] },
   { block: "P2", type: "likert", points: 5, intro: "인공지능(AI)에 대한 평소 생각을 묻습니다. 각 문장에 얼마나 동의하는지 선택해 주세요.",
-    leftLabel: "1 = 전혀 아니다", rightLabel: "5 = 매우 그렇다",
+    leftLabel: "1 = 전혀 동의하지 않는다", rightLabel: "5 = 매우 동의한다",
     items: [
       { id: "ai_1", text: "AI는 세상을 더 나은 곳으로 변화시킬 것이다." },
       { id: "ai_2", text: "나는 AI에 대해 강한 거부감(부정적인 감정)을 느낀다." },
       { id: "ai_3", text: "나는 AI를 활용한 기술을 사용해 보고 싶다." },
       { id: "ai_4", text: "AI는 장점보다 단점이 더 많다고 생각한다." },
-      { id: "ai_5", text: "나는 앞으로 AI가 어떻게 발전될지 기대한다." },
+      { id: "ai_5", text: "나는 앞으로 AI가 어떻게 발전될지 기대된다." },
       { id: "ai_6", text: "AI는 세상의 다양한 문제에 대한 해결책을 제시한다." },
       { id: "ai_7", text: "나는 AI 없이 작동하는 기술을 더 선호한다." },
       { id: "ai_8", text: "나는 AI에 대해 두려움을 느낀다." },
