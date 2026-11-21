@@ -568,7 +568,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.11.4",
+  appVersion: "v8.11.5",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -729,9 +729,9 @@ const POST_SURVEY = [
       { id: "tia_11", text: "나는 드론의 경로 선택을 신뢰할 수 있다." }
     ] },
   { block: "B", type: "slider100", leftLabel: "0%", rightLabel: "100%", items: [
-      { id: "mc_accuracy", text: "20회 동안 드론의 선택이 실제로 더 빠른 경로였던 비율은 몇 % 정도였다고 생각하나요?" } ] },
+      { id: "mc_accuracy", text: "20회 동안 드론의 선택이 더 빠른 경로였던 비율은 몇 % 정도였다고 생각하나요?" } ] },
   { block: "B2", type: "choice", items: [
-      { id: "mc_error_noticed", text: "드론이 실제로 더 느린 경로를 선택한 회차가 있었나요?",
+      { id: "mc_error_noticed", text: "드론이 더 느린 경로를 선택한 회차가 있었나요?",
         options: [["yes","있었다"],["no","없었다"],["unsure","잘 모르겠다"]] } ] },
   { block: "B3", type: "choice", items: [
       { id: "memo_used", text: "본 과제를 메모하며 진행하셨나요?", options: [["yes","예"],["no","아니오"]] } ] },
