@@ -568,7 +568,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.11.5",
+  appVersion: "v8.12.0",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -866,7 +866,10 @@ function makeFirebaseBackend(){
       const sess = Object.assign({}, base, deviceInfo(), { seq: p.k, alloc: CONFIG.alloc.version, condition: r.condition, template: r.template, assign_reused: p.r, created_at: F.fs.serverTimestamp() });
       const b = F.fs.writeBatch(F.db);
       b.set(sref, sess);
-      b.set(d("alloc_log", `${p.k}_${p.r}`), { type: p.r ? "reissue" : "assign", seq: p.k, r: p.r, uid: api.uid, prev_uid: p.prev || "",
+      // 세션을 만들기 전에 이탈했다가 90분 넘어 돌아왔고 그사이 이 seq가 다른 사람에게 재발급된 경우: 배정 기록(seq_r)은 이미 새 배정자 것이므로 쓰지 않음
+      //   (쓰면 규칙상 '수정'으로 거부되어 이 참가자가 계속 진행하지 못함). 결과는 그대로 저장되며 연구자 페이지에서 같은 seq의 추가 완료로 보임
+      if (p.existing && p.owner === false) log("page", { note: `seq_${p.k}_reissued_before_session` });
+      else b.set(d("alloc_log", `${p.k}_${p.r}`), { type: p.r ? "reissue" : "assign", seq: p.k, r: p.r, uid: api.uid, prev_uid: p.prev || "",
         reason: p.r ? `timeout_${CONFIG.slotTimeoutMin}min_unfinished` : "", app_version: CONFIG.appVersion, ts: F.fs.serverTimestamp() });
       await b.commit();
       return Object.assign({}, sess, { created_at: null });
@@ -905,12 +908,18 @@ function makeFirebaseBackend(){
 const tsMs = v => v == null ? NaN : typeof v.toMillis === "function" ? v.toMillis() : typeof v.toDate === "function" ? v.toDate().getTime() : (v.__ts ?? Number(v));
 function allocPlan(a, uid, now, noReuse = false){
   const total = Number(a.total) || 0, n = Number(a.n) || 0, slots = a.slots || {}, who = a.who || {};
-  if (Object.prototype.hasOwnProperty.call(who, uid)) { const k = Number(who[uid]), sl = slots[k] || {}; return { k, n, r: Number(sl.r) || 0, prev: "", existing: true }; }
+  // 이미 seq를 받은 사람(새로고침·재접속): 같은 seq. owner=false면 세션을 만들기 전에 그 seq가 다른 사람에게 재발급된 경우
+  if (Object.prototype.hasOwnProperty.call(who, uid)) { const k = Number(who[uid]), sl = slots[k] || {}; return { k, n, r: Number(sl.r) || 0, prev: "", existing: true, owner: sl.u === uid }; }
   const limit = CONFIG.slotTimeoutMin * 60000;
-  const free = noReuse ? undefined : Object.keys(slots).map(Number).filter(k => Number.isInteger(k) && k >= 1 && k <= n).sort((x, y) => x - y)
-    .find(k => { const sl = slots[k] || {}; return !sl.d && now - tsMs(sl.t) > limit; });
+  const used = Object.keys(slots).map(Number).filter(k => Number.isInteger(k) && k >= 1 && k <= n).sort((x, y) => x - y);
+  // ① 중도 이탈 seq(배정 후 90분 동안 미완료) 중 가장 앞 번호부터 다시 발급 → 배정표 순서(9:9:7 블록)가 그대로 채워짐
+  const free = noReuse ? undefined : used.find(k => { const sl = slots[k] || {}; return !sl.d && now - tsMs(sl.t) > limit; });
   if (free !== undefined) return { k: free, n, r: (Number(slots[free].r) || 0) + 1, prev: slots[free].u || "", existing: false };
+  // ② 다음 새 seq
   if (n < total) return { k: n + 1, n: n + 1, r: 0, prev: "", existing: false };
+  // ③ 새 seq가 없을 때: 기기 시계가 늦어 ①을 못 찾았을 수 있으므로 가장 오래된 미완료 seq를 한 번 시도(90분 판단은 서버 규칙이 함, 아니면 거부 → 마감)
+  if (!noReuse) { const old = used.filter(k => !(slots[k] || {}).d).sort((x, y) => tsMs(slots[x].t) - tsMs(slots[y].t))[0];
+    if (old !== undefined) return { k: old, n, r: (Number(slots[old].r) || 0) + 1, prev: slots[old].u || "", existing: false, tentative: true }; }
   return { closed: true };
 }
 /* 배정 시점에 함께 저장하는 기기 정보 */
@@ -943,7 +952,8 @@ function makeMockBackend(){
     async assign(base){
       await net();
       if (st.sessions[api.uid]) return st.sessions[api.uid];
-      const p = allocPlan(st.alloc, api.uid, Date.now());
+      let p = allocPlan(st.alloc, api.uid, Date.now());
+      if (p.tentative && !(Date.now() - tsMs(st.alloc.slots[p.k].t) > CONFIG.slotTimeoutMin * 60000)) p = allocPlan(st.alloc, api.uid, Date.now(), true);   // 서버 규칙처럼 90분 전이면 거부
       if (p.closed) throw Object.assign(new Error("closed"), { code: "closed" });
       if (!p.existing) { st.alloc.n = p.n; st.alloc.slots[p.k] = { t: Date.now(), d: false, r: p.r, u: api.uid }; st.alloc.who[api.uid] = p.k; }
       const row = mockRow(p.k);
@@ -1256,6 +1266,7 @@ function restoreLocal(){
 function show(id){
   document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
   $(id).classList.add('active'); window.scrollTo(0, 0);
+  if (id !== 's-trial') { clearTimeout(edgeTimer); const e = $('edge'); if (e) e.className = ""; }   // 정답·오답 테두리 빛이 다음 화면(이해 확인·설문 등)까지 남지 않게
 }
 function setPhase(p){ S.phase = p; log("page"); }
 window.addEventListener('error', e => { try { log("error", { note: String(e.message).slice(0, 200) }); } catch(_){} });
@@ -1350,11 +1361,37 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 function block(title, text){ $('blocked-title').textContent = title; $('blocked-text').textContent = text; show('s-blocked'); }
 function showClosed(){ log("page", { note: "closed" }); S.leaveOK = true; GUARD = false; block("모집이 마감되었습니다", `준비한 참여 인원이 모두 찼습니다. 관심을 가져 주셔서 감사합니다. 문의: ${CONFIG.consent.contact}`); }
 
+/* 같은 브라우저의 두 탭(창)에서 동시에 진행하면(같은 익명 계정) 회차 기록이 서로 부딪혀 한쪽이 멈출 수 있음
+   → 가장 나중에 연 탭만 진행하고, 앞서 열린 탭은 안내를 띄워 멈춤('이 탭에서 계속하기'로 되돌릴 수 있음) */
+const TAB_ID = Math.random().toString(36).slice(2) + Date.now().toString(36), TAB_KEY = "droneExp_activeTab";
+let TAB_FROZEN = false;
+function claimTab(){ try { localStorage.setItem(TAB_KEY, JSON.stringify({ uid: S.uid, tab: TAB_ID, ts: Date.now() })); } catch (_) {} }
+function freezeTab(){
+  if (TAB_FROZEN) return; TAB_FROZEN = true;
+  try { log("page", { note: "other_tab_opened" }); persistLocal(); } catch (_) {}
+  window.onbeforeunload = null; S.leaveOK = true; GUARD = false;   // 이 탭은 바로 닫을 수 있게
+  const o = document.createElement('div'); o.id = 'tab-freeze'; o.setAttribute('role', 'alertdialog');
+  o.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(29,42,51,.88);display:flex;align-items:center;justify-content:center;padding:20px";
+  o.innerHTML = `<div style="background:#fbfbf9;color:#1d2a33;border-radius:14px;padding:22px 20px;max-width:420px;width:100%;line-height:1.6;box-shadow:0 10px 30px rgba(0,0,0,.3)">
+    <h2 style="font-size:19px;margin-bottom:10px">다른 탭(창)에서 실험이 열렸습니다</h2>
+    <p style="margin-bottom:8px">두 곳에서 동시에 진행하면 기록이 섞일 수 있어 <b>이 탭은 멈췄습니다.</b></p>
+    <p style="margin-bottom:16px"><b>방금 연 탭(창)에서 이어서 진행</b>하시고, 이 탭은 닫아 주세요. 지금까지의 응답은 그대로 이어집니다.</p>
+    <button class="btn btn-ghost" id="b-tab-here" type="button" style="width:100%">이 탭에서 계속하기</button></div>`;
+  document.body.appendChild(o);
+  $('b-tab-here').onclick = () => { claimTab(); location.reload(); };
+}
+window.addEventListener('storage', e => {
+  if (e.key !== TAB_KEY || !e.newValue || !S.uid || TAB_FROZEN) return;
+  let v; try { v = JSON.parse(e.newValue); } catch (_) { return; }
+  if (v && v.uid === S.uid && v.tab !== TAB_ID) freezeTab();
+});
+
 $('b-start').onclick = async () => {
   const b = $('b-start'); b.disabled = true; b.textContent = "준비 중…"; $('start-err').textContent = "";
   try {
     try { S.uid = await net("init", () => BE.init(), { timeout: 30000, fatal: code => /^auth\/(admin-restricted-operation|operation-not-allowed|unauthorized-domain)/.test(code) }); }
     catch (e) { block("지금은 실험을 시작할 수 없습니다", `실험 서버의 로그인 설정이 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (${(e && e.code) || "auth"})`); return; }
+    claimTab();   // 이 탭이 지금 진행하는 탭(같은 계정의 다른 탭은 멈춤)
     const sha = await net("stimulus", () => BE.stimulusSha());
     if (sha !== CONFIG.stimulusSha256) { block("지금은 실험을 시작할 수 없습니다", "실험 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (자극 확인 실패)"); return; }
     const sess = await net("session", () => BE.getSession());
@@ -1369,7 +1406,7 @@ $('b-start').onclick = async () => {
     let alloc = null;
     try { alloc = await net("alloc", () => BE.allocInfo(), { fatal: c => c === "permission-denied" }); } catch (e) { alloc = null; }   // 새 보안 규칙 게시 전에도 오류 반복 대신 '준비 중' 안내
     if (!alloc || !(Number(alloc.total) > 0)) { block("지금은 실험을 시작할 수 없습니다", `실험 배정 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (문의: ${CONFIG.consent.contact})`); return; }
-    if (allocPlan(alloc, S.uid, Date.now()).closed) { showClosed(); return; }
+    { const pl = allocPlan(alloc, S.uid, Date.now()); if (pl.closed || pl.tentative) { showClosed(); return; } }   // 시작 화면 점검: 새 seq·재발급 자리가 없으면 마감(진행 중인 seq만 남은 경우 포함)
     setPhase("consent"); show('s-consent');
   } finally { if (!BAD_ORIGIN) { b.disabled = false; b.textContent = "시작하기"; } }
 };
