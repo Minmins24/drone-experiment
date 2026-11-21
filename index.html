@@ -568,7 +568,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.11.2",
+  appVersion: "v8.11.3",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -1958,11 +1958,35 @@ async function finish(){
   const st = $('up-status'), tx = $('up-text');
   if (PREVIEW) {
     await BE.finish(rec);
-    st.className = "status fail"; tx.textContent = "미리보기에서는 서버에 저장되지 않습니다. 아래는 이번 실행의 요약 값입니다.";
-    for (const id of ['b-share', 'b-download', 'end-guide', 'end-ios-tip']) $(id).style.display = 'none';
     const pre = document.createElement('pre'); pre.style.cssText = "white-space:pre-wrap;font-size:13px;background:#f3f4f1;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;overflow-x:auto";
     pre.textContent = SUM_COLS.filter(c => !["condition","template","cell","slot","uid","phone"].includes(c)).map(c => `${c} = ${rec.summary[c] ?? ""}`).join("\n");
-    $('end-files').after(pre); return;
+    $('end-files').after(pre);
+    const partEls = ['b-share', 'b-download', 'end-guide', 'end-ios-tip'];
+    const summaryView = () => {
+      st.className = "status fail"; tx.textContent = "미리보기에서는 서버에 저장되지 않습니다. 아래는 이번 실행의 요약 값입니다.";
+      for (const id of partEls) $(id).style.display = 'none'; $('retry-row').hidden = true; pre.hidden = false; $('mail-msg').hidden = true;
+      const fb = $('file-btns'); if (fb) fb.remove();
+    };
+    summaryView();
+    /* 연구자 미리보기 전용: 참가자가 보게 될 마지막 화면(저장됨·저장 안 됨)을 그대로 확인(서버 저장은 하지 않음) */
+    if (window.__RP) {
+      const bar = document.createElement('div'); bar.id = 'rp-endbar';
+      bar.style.cssText = "display:grid;gap:8px;background:#1d2a33;color:#fff;border-radius:12px;padding:12px;margin:0 0 16px;font-size:13px;line-height:1.5";
+      bar.innerHTML = `<b style="font-size:14px">연구자 확인용 · 참가자 마지막 화면 보기</b><span style="color:#b8c3ca">결과는 실제로 저장되지 않습니다. 문구·버튼은 실제 참가자 화면과 같습니다.</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${[["ok", "결과 저장 O"], ["fail", "결과 저장 X"], ["sum", "요약 값"]].map(([k, t]) =>
+          `<button type="button" data-end="${k}" style="flex:1 1 90px;font:inherit;font-weight:650;border-radius:8px;border:1px solid #4a5a65;background:#2c3c47;color:#fff;padding:8px 6px;cursor:pointer;min-height:40px">${t}</button>`).join("")}</div>`;
+      $('s-end').querySelector('h1').before(bar);
+      const pick = k => { bar.querySelectorAll('[data-end]').forEach(b => { const on = b.dataset.end === k; b.style.background = on ? "#f2b33d" : "#2c3c47"; b.style.color = on ? "#1d2a33" : "#fff"; b.setAttribute('aria-pressed', on); }); };
+      bar.querySelectorAll('[data-end]').forEach(b => b.onclick = () => {
+        const k = b.dataset.end; pick(k); $('mail-msg').hidden = true; const fb = $('file-btns'); if (fb) fb.remove();
+        if (k === "sum") { summaryView(); return; }
+        for (const id of partEls) $(id).style.display = ''; pre.hidden = true;
+        endState(k === "ok");
+      });
+      $('b-retry').onclick = () => mailMsg("연구자 미리보기에서는 '다시 보내기'를 눌러도 서버로 보내지 않습니다. 실제 참가자 화면에서는 이 버튼으로 결과를 다시 보냅니다.");
+      pick("sum");
+    }
+    return;
   }
   window.onbeforeunload = e => { e.preventDefault(); e.returnValue = ""; };
   let saved = false, busy = false, tries = 0;
@@ -1978,12 +2002,9 @@ async function finish(){
     busy = false; $('b-retry').disabled = false; $('b-retry').textContent = "다시 보내기";
     if (saved) {
       window.onbeforeunload = null; S.leaveOK = true; GUARD = false; $('retry-row').hidden = true; clearInterval(timer);
-      st.className = "status ok"; tx.textContent = "결과가 자동으로 저장되었습니다.\n결과 파일 보내기는 필수가 아니므로\n이 창을 닫으셔도 됩니다.";
-      $('guide-ok').hidden = false; $('guide-fail').hidden = true;
+      endState(true);
     } else {
-      $('retry-row').hidden = false;
-      st.className = "status fail"; tx.textContent = "결과가 저장되지 않았습니다.\n아래 다시 보내기를 눌러주세요.";   // 창이 열려 있는 동안 자동 재전송도 계속됨
-      $('guide-ok').hidden = true; $('guide-fail').hidden = false;
+      endState(false);   // 창이 열려 있는 동안 자동 재전송도 계속됨
       if (tries === 40) { clearInterval(timer); timer = setInterval(attempt, 60000); }   // 10분이 지나면 1분 간격으로, 창이 열려 있는 동안 계속
     }
   };
@@ -1994,6 +2015,14 @@ async function finish(){
   await attempt();
 }
 function fileList(){ return [FILES.summary, FILES.trials, FILES.events]; }
+/* 마지막 화면 상태(참가자 화면·연구자 미리보기 공용): ok=true 저장됨(초록), false 저장 안 됨(빨강) */
+function endState(ok){
+  const st = $('up-status'), tx = $('up-text');
+  st.className = ok ? "status ok" : "status fail";
+  tx.textContent = ok ? "결과가 자동으로 저장되었습니다.\n결과 파일 보내기는 필수가 아니므로\n이 창을 닫으셔도 됩니다."
+                      : "결과가 저장되지 않았습니다.\n아래 다시 보내기를 눌러주세요.";
+  $('retry-row').hidden = ok; $('guide-ok').hidden = !ok; $('guide-fail').hidden = ok;
+}
 function download(){
   fileList().forEach((f, i) => setTimeout(() => {
     const url = URL.createObjectURL(new Blob([f.text], { type: "text/csv;charset=utf-8" }));
