@@ -137,6 +137,9 @@ input[type=range].untouched::-moz-range-thumb{opacity:0}
 .box.inapp{border:2px solid var(--accent);background:#fff7e2}
 button,.opt,.pick,.lk button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .file-btns{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.net-wait{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));z-index:49;display:flex;align-items:center;gap:8px;background:#1d2a33;color:#fff;font-size:14px;font-weight:600;padding:9px 14px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-width:calc(100% - 24px);pointer-events:none}
+.net-wait .spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#f2b33d;border-radius:50%;animation:spin .8s linear infinite;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
 .net{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:50;background:#fff;border:2px solid var(--bad);
   border-radius:12px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.2);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .net span{flex:1 1 220px;font-weight:650;font-size:15px}
@@ -165,6 +168,8 @@ button,.opt,.pick,.lk button{-webkit-user-select:none;user-select:none;-webkit-t
 body.gl-on #gl{display:block}
 #fade{position:fixed;inset:0;background:#0f171c;opacity:0;pointer-events:none;transition:opacity .22s;z-index:5}
 #fade.on{opacity:1}
+.stuck-btn{position:fixed;right:max(10px,env(safe-area-inset-right));top:calc(10px + env(safe-area-inset-top));z-index:45;font:inherit;font-size:13px;font-weight:650;color:#fff;background:rgba(29,42,51,.78);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:8px 12px;min-height:36px}
+body:not(.gl-on) .stuck-btn{color:var(--ink);background:#fff;border-color:var(--line)}
 #edge{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;transition:opacity .3s}
 #edge.ok{box-shadow:inset 0 0 0 6px #2f7d5b,inset 0 0 60px rgba(47,125,91,.55)}
 #edge.bad{box-shadow:inset 0 0 0 6px #b4442f,inset 0 0 60px rgba(180,68,47,.55)}
@@ -172,7 +177,7 @@ body.gl-on #gl{display:block}
 body.gl-on{background:#1a2329;overflow:hidden}
 body.gl-on #s-trial.active{position:fixed;inset:0;z-index:10;background:transparent;align-items:flex-end;min-height:0;padding:0 12px calc(12px + env(safe-area-inset-bottom));pointer-events:none}
 body.gl-on #s-trial .card{pointer-events:auto;max-height:58vh;max-height:58dvh;overflow-y:auto;overscroll-behavior:contain;margin-top:0;background:rgba(251,251,249,.97)}
-body.gl-on #s-trial.moving .card{visibility:hidden}
+body.gl-on #s-trial.moving .card{display:none}
 body.gl-on #s-trial .card{padding:16px}
 body.gl-on #s-trial .topbar{margin-bottom:8px}
 body.gl-on .step{margin-top:12px;padding-top:12px}
@@ -428,6 +433,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
 </section>
 
 <!-- ============ 회차(연습·본 과제 공용) ============ -->
+<button type="button" class="stuck-btn" id="b-stuck" hidden>화면이 멈췄나요?</button>
 <section class="screen" id="s-trial">
   <div class="card wide">
     <div class="topbar"><span id="tb-left"></span><span class="muted" id="tb-right"></span></div>
@@ -498,6 +504,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
   </div>
 </section>
 
+<div class="net-wait" id="net-wait" hidden role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span>서버와 연결하는 중입니다. 잠시만 기다려 주세요…</div>
 <div class="net" id="net" hidden role="alert"><span id="net-text">연결이 원활하지 않습니다. 입력한 내용은 그대로 남아 있습니다.</span><button class="btn btn-primary" id="b-net" style="min-height:44px">다시 시도</button></div>
 
 <div id="boot-err" role="alert" style="display:none;position:fixed;left:12px;right:12px;bottom:12px;z-index:100;background:#fff;border:2px solid #b4442f;border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.5;color:#1d2a33;box-shadow:0 6px 24px rgba(0,0,0,.25)"></div>
@@ -568,7 +575,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.12.1",
+  appVersion: "v8.12.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -824,10 +831,41 @@ function makeFirebaseBackend(){
       import(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore.js`) ]);
     // 이름 붙인 앱: 같은 브라우저에서 연구자가 admin.html에 Google로 로그인해 있어도 참가자 로그인과 섞이지 않음
     const app = appMod.initializeApp(CONFIG.firebase, "participant");
-    F = { auth: authMod.getAuth(app), authMod, db: fs.getFirestore(app), fs };
+    // 아이폰·아이패드(모든 iOS 브라우저는 Safari 엔진): 실시간 연결(스트리밍)이 멈춰 응답이 오지 않는 사례가 있어
+    // Firebase가 공식 지원하는 '롱 폴링' 방식으로 통신(조금 느리지만 끊김에 강함). 그 밖의 기기는 자동 감지(기본값)
+    let db;
+    try { db = (OS === "ios" && fs.initializeFirestore) ? fs.initializeFirestore(app, { experimentalForceLongPolling: true }) : fs.getFirestore(app); }
+    catch (_) { db = fs.getFirestore(app); }
+    F = { auth: authMod.getAuth(app), authMod, db, fs };
     return F;
   };
   const d = (...p) => F.fs.doc(F.db, ...p);
+  /* 문서 1개 읽기: Firebase 라이브러리로 8초 안에 응답이 없거나 일시 오류면, 같은 로그인 정보로 Firestore REST 주소에 직접 한 번 더 요청
+     (보안 규칙은 똑같이 적용됨). 라이브러리 연결이 멈춘 상태(특히 iOS)에서도 단서·결과를 받아 다음 단계로 갈 수 있게 함 */
+  const restVal = v => { if (!v || typeof v !== "object") return null;
+    if ("stringValue" in v) return v.stringValue; if ("integerValue" in v) return Number(v.integerValue); if ("doubleValue" in v) return Number(v.doubleValue);
+    if ("booleanValue" in v) return v.booleanValue; if ("nullValue" in v) return null; if ("timestampValue" in v) return { __ts: Date.parse(v.timestampValue) };
+    if ("mapValue" in v) return restFields(v.mapValue.fields || {}); if ("arrayValue" in v) return (v.arrayValue.values || []).map(restVal); return null; };
+  const restFields = f => { const o = {}; for (const k of Object.keys(f)) o[k] = restVal(f[k]); return o; };
+  async function restGet(segs){
+    const tok = await F.auth.currentUser.getIdToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${CONFIG.firebase.projectId}/databases/(default)/documents/${segs.map(encodeURIComponent).join("/")}`;
+    const r = await withTimeout(fetch(url, { headers: { Authorization: "Bearer " + tok }, cache: "no-store" }), 12000);
+    if (r.status === 404) return null;
+    if (r.status === 401 || r.status === 403) throw Object.assign(new Error("permission-denied"), { code: "permission-denied" });
+    if (!r.ok) throw Object.assign(new Error("rest_" + r.status), { code: r.status === 429 ? "resource-exhausted" : "unavailable" });
+    const j = await r.json(); return restFields(j.fields || {});
+  }
+  async function getOne(...segs){
+    try { const s = await withTimeout(F.fs.getDoc(d(...segs)), 8000); return s.exists() ? s.data() : null; }
+    catch (e) {
+      const code = String((e && (e.code || e.message)) || "error");
+      if (!TRANSIENT_RE.test(code) || typeof fetch !== "function") throw e;
+      try { log("net_error", { step: "read_rest_fallback:" + segs[0], note: code.slice(0, 60) }); } catch (_) {}
+      try { return await restGet(segs); }
+      catch (e2) { if (e2 && e2.code === "permission-denied") throw e2; throw e; }   // 대체 경로도 실패하면 원래 오류로 처리(자동 재시도 대상 유지)
+    }
+  }
   const api = {
     kind: "firebase", uid: null,
     async init(){
@@ -837,8 +875,8 @@ function makeFirebaseBackend(){
       api.uid = user && user.isAnonymous ? user.uid : (await withTimeout(F.authMod.signInAnonymously(F.auth), 20000)).user.uid;
       return api.uid;
     },
-    async stimulusSha(){ const s = await F.fs.getDoc(d("meta", "stimulus")); return s.exists() ? s.data().sha256 : null; },
-    async getSession(){ const s = await F.fs.getDoc(d("sessions", api.uid)); return s.exists() ? s.data() : null; },
+    async stimulusSha(){ const x = await getOne("meta", "stimulus"); return x ? x.sha256 : null; },
+    async getSession(){ return await getOne("sessions", api.uid); },
     async allocInfo(){ const x = await F.fs.getDoc(d("meta", "alloc")); return x.exists() ? x.data() : null; },
     async markVisit(){ try { await F.fs.setDoc(d("visits", api.uid), { app_version: CONFIG.appVersion, ts: F.fs.serverTimestamp() }); } catch (e) {} },   // 첫 방문 서버 시각(소요시간 계산용). 이미 있으면 거부됨(무시)
     /* 배정: ① meta/alloc 트랜잭션으로 seq 확보(동시 접속 시 Firestore가 재실행, 규칙이 중복·순서를 검사)
@@ -876,9 +914,9 @@ function makeFirebaseBackend(){
     },
     setT0: v => F.fs.updateDoc(d("sessions", api.uid), v),
     async listTrials(){ const q = await F.fs.getDocs(F.fs.collection(F.db, "sessions", api.uid, "trials")); const o = {}; q.forEach(x => o[x.id] = x.data()); return o; },
-    async getTrial(t){ const s = await F.fs.getDoc(d("sessions", api.uid, "trials", t)); return s.exists() ? s.data() : null; },
-    async getCue(tpl, t){ const s = await F.fs.getDoc(d("cues", tpl, "t", t)); if (!s.exists()) throw Object.assign(new Error("no_cue"), { code: "no_cue" }); return s.data(); },
-    async getOutcome(tpl, cond, t){ const s = await F.fs.getDoc(d("outcomes", tpl, "c", cond, "t", t)); if (!s.exists()) throw Object.assign(new Error("no_outcome"), { code: "no_outcome" }); return s.data(); },
+    async getTrial(t){ return await getOne("sessions", api.uid, "trials", t); },
+    async getCue(tpl, t){ const x = await getOne("cues", tpl, "t", t); if (!x) throw Object.assign(new Error("no_cue"), { code: "no_cue" }); return x; },
+    async getOutcome(tpl, cond, t){ const x = await getOne("outcomes", tpl, "c", cond, "t", t); if (!x) throw Object.assign(new Error("no_outcome"), { code: "no_outcome" }); return x; },
     createTrial: (t, v) => F.fs.setDoc(d("sessions", api.uid, "trials", t), v),
     updateTrial: (t, v) => F.fs.updateDoc(d("sessions", api.uid, "trials", t), v),
     async finish(rec){
@@ -1152,7 +1190,7 @@ async function fadeOut(){ $('fade').classList.add('on'); await sleep(MOVE.fade);
 async function fadeIn(){ $('fade').classList.remove('on'); await sleep(MOVE.fade); }
 /* 이동 중에는 정보 판을 잠시 숨김. 어떤 이유로든 이동이 9초 넘게 끝나지 않으면 판을 다시 보여 주고 2D로 전환(화면 멈춤 방지) */
 let movingTimer;
-const moving = on => { $('s-trial').classList.toggle('moving', on); clearTimeout(movingTimer);
+const moving = on => { $('s-trial').classList.toggle('moving', on); clearTimeout(movingTimer); if (!on) repaintPanel();
   if (on) movingTimer = setTimeout(() => { if ($('s-trial').classList.contains('moving')) glFail("moving_watchdog"); }, 9000); };
 async function safeScene(name, fn){ try { await fn(); } catch (e) { glFail(name + "_error:" + ((e && e.message) || e)); } }
 
@@ -1197,15 +1235,46 @@ async function sceneLeave(){ if (!USE_GL() || !renderer) return; return safeScen
 let edgeTimer;
 function edgeFlash(ok){ const e = $('edge'); e.className = (ok ? "ok" : "bad") + " show"; clearTimeout(edgeTimer); edgeTimer = setTimeout(() => e.className = ok ? "ok" : "bad", 1600); }
 function sceneOff(){ document.body.classList.remove('gl-on'); $('fade').classList.remove('on'); $('s-trial').classList.remove('moving'); clearTimeout(movingTimer); }
-function panelTo(id){ try { $(id).scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }
+/* 아이폰 Safari: 고정된 정보 판 안에서 scrollIntoView(특히 부드러운 스크롤)를 쓰면 페이지 자체가 밀리거나,
+   스크롤이 움직이는 동안의 첫 터치가 '스크롤 멈춤'으로만 처리되어 버튼이 눌리지 않을 수 있음
+   → 3D 화면에서는 정보 판 안만 즉시 스크롤하고 페이지는 항상 맨 위에 고정 */
+function scrollInPanel(el, block = "nearest"){
+  try {
+    if (!el) return;
+    const card = el.closest('.card');
+    if (!document.body.classList.contains('gl-on') || !card) { el.scrollIntoView({ block, behavior: "auto" }); return; }
+    const r = el.getBoundingClientRect(), c = card.getBoundingClientRect(), pad = 8;
+    if (block === "start") card.scrollTop += r.top - c.top - pad;
+    else if (r.bottom > c.bottom - pad) card.scrollTop += r.bottom - c.bottom + pad;
+    else if (r.top < c.top + pad) card.scrollTop -= c.top - r.top + pad;
+    pinPage();
+  } catch (e) {}
+}
+function pinPage(){ if (document.body.classList.contains('gl-on') && (window.scrollX || window.scrollY)) window.scrollTo(0, 0); }
+window.addEventListener('scroll', pinPage, { passive: true });
+/* 정보 판 내용이 바뀐 뒤 화면을 확실히 다시 그리게 함(아이폰에서 바뀐 부분이 그려지지 않고 예전 모습이 남는 문제 방지) */
+function repaintPanel(){
+  try { const c = document.querySelector('#s-trial .card'); if (!c) return; c.style.transform = "translateZ(0)"; void c.offsetHeight;
+    requestAnimationFrame(() => { c.style.transform = ""; }); setTimeout(() => { c.style.transform = ""; }, 120); pinPage(); } catch (e) {}
+}
+function panelTo(id){ scrollInPanel($(id)); repaintPanel(); }
 
 /* 네트워크 호출: 실패하면 화면 아래에 '다시 시도'를 띄우고, 성공할 때까지 같은 단계에 머무름 (결과 재추첨 없음) */
 /* v8.11.0: 동시 접속이 몰릴 때 서버가 잠깐 내는 오류(경합·일시 장애·시간 초과)는 참가자에게 보이지 않게
    자동으로 다시 시도(점점 길게, 무작위로 흩어서). 그래도 안 되면 안내 창을 띄우되, 창이 떠 있어도 20초마다 스스로 다시 시도. */
 const TRANSIENT_RE = /aborted|unavailable|deadline|resource-exhausted|internal|timeout|failed-precondition|cancelled|unknown|network|offline|fetch|too-many-requests|quota-exceeded/i;
 const SILENT_TRIES = 6;   // 약 0.8·1.6·3.2·6.4·12·15초(±40%) → 최대 약 40초 동안 조용히 재시도
+let NET_BUSY = 0, netBusyTimer = 0;
+function netBusy(on){
+  NET_BUSY = Math.max(0, NET_BUSY + (on ? 1 : -1)); clearTimeout(netBusyTimer);
+  const w = $('net-wait'); if (!w) return;
+  if (NET_BUSY > 0) netBusyTimer = setTimeout(() => { if (NET_BUSY > 0 && $('net').hidden) w.hidden = false; }, 1500);   // 1.5초 넘게 걸릴 때만 표시
+  else w.hidden = true;
+}
 async function net(label, fn, opts = {}){
-  let silent = 0;
+  let silent = 0, timeouts = 0;
+  netBusy(true);
+  try {
   for (let attempt = 1; ; attempt++) {
     try { return await withTimeout(fn(), opts.timeout || 20000); }
     catch (e) {
@@ -1214,8 +1283,10 @@ async function net(label, fn, opts = {}){
       if (opts.recover) { try { const r = await opts.recover(e); if (r !== undefined) return r; } catch (_) {} }
       if (opts.fatal && opts.fatal(code)) throw e;
       const transient = TRANSIENT_RE.test(String(code));
+      if (code === "timeout") timeouts++;
       // 일시 오류이거나, 처음 한 번의 거부(예: 같은 순간 다른 참가자의 변경과 겹침)는 조용히 다시 시도
-      if ((transient && silent < SILENT_TRIES) || (code === "permission-denied" && silent < 1)) {
+      // 단, 응답 없이 시간 초과가 두 번 나면 더 기다리게 하지 않고 바로 안내 창(다시 시도 버튼·자동 재시도)을 띄움
+      if (((transient && silent < SILENT_TRIES && timeouts < 2) || (code === "permission-denied" && silent < 1))) {
         silent++; await sleep(Math.min(15000, 800 * 2 ** (silent - 1)) * (0.6 + Math.random() * 0.8)); continue;
       }
       $('net-text').textContent = (/too-many-requests|quota-exceeded/.test(String(code))
@@ -1226,11 +1297,12 @@ async function net(label, fn, opts = {}){
           ? `실험 서버에 연결하지 못했습니다. ${IS_MOBILE() ? "와이파이·데이터" : "인터넷"} 연결을 확인하고, 메신저·앱 안이 아닌 ${DEV.recLong}에서 실험 주소(${CONFIG.officialUrl})로 열어 주세요.`
           : "연결이 원활하지 않습니다. 입력한 내용은 그대로 남아 있습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.")
         + ` (오류: ${String(code).slice(0, 60)})`;
-      $('net').hidden = false;
+      $('net').hidden = false; if ($('net-wait')) $('net-wait').hidden = true;
       await new Promise(res => { $('b-net').onclick = res; window.addEventListener('online', res, { once: true }); if (transient) setTimeout(res, 20000 + Math.random() * 5000); });
-      $('net').hidden = true; silent = Math.max(0, SILENT_TRIES - 2);   // 창이 닫힌 뒤에도 두 번은 조용히 더 시도
+      $('net').hidden = true; silent = Math.max(0, SILENT_TRIES - 2); timeouts = Math.min(timeouts, 1);   // 창이 닫힌 뒤에도 두 번은 조용히 더 시도
     }
   }
+  } finally { netBusy(false); }
 }
 
 /* =====================================================================
@@ -1288,8 +1360,17 @@ function pickGroup(host, onPick){
   btns.forEach(b => { b.disabled = false; b.classList.remove('sel'); b.setAttribute('aria-pressed', 'false');
     b.onclick = () => { if (firstT === null) firstT = performance.now(); btns.forEach(x => { x.classList.remove('sel'); x.setAttribute('aria-pressed','false'); });
       b.classList.add('sel'); b.setAttribute('aria-pressed','true'); val = Number(b.dataset.v); onPick(val);
-      const cf = host.parentElement && host.parentElement.querySelector('.btn-primary'); if (cf) try { cf.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (e) {} }; });
-  return { value: () => val, firstT: () => firstT, lock: () => btns.forEach(b => b.disabled = true) };
+      const cf = host.parentElement && host.parentElement.querySelector('.btn-primary'); if (cf) scrollInPanel(cf); repaintPanel(); }; });
+  /* 자가 복구: 고른 뒤에도 '선택 확정'이 꺼져 있거나(화면 갱신 누락), 경로 정보가 사라진 경우 1초마다 바로잡음 */
+  const cf0 = host.parentElement && host.parentElement.querySelector('.btn-primary');
+  const heal = setInterval(() => {
+    if (locked) { clearInterval(heal); return; }
+    if (val !== null && cf0 && cf0.disabled) { cf0.disabled = false; repaintPanel(); try { log("page", { note: "heal_confirm" }); } catch (_) {} }
+    if (host.id === 'h-picks' && CUE_HTML && !$('cue-grid').innerHTML.trim() && !$('st-h').hidden) { $('cue-grid').innerHTML = CUE_HTML; repaintPanel(); try { log("page", { note: "heal_cue" }); } catch (_) {} }
+    btns.forEach(b => { if (b.disabled) b.disabled = false; });
+  }, 1000);
+  let locked = false;
+  return { value: () => val, firstT: () => firstT, lock: () => { locked = true; clearInterval(heal); btns.forEach(b => b.disabled = true); } };
 }
 /* 정답·오답 표시: 실제 배송시간이 더 짧은 경로(Y)를 고른 경우 정답(초록), 아니면 오답(빨강). 색과 함께 ✓·✕ 기호와 글자로도 표시 */
 function verdictHTML(ok, who, side, time){
@@ -1386,6 +1467,25 @@ window.addEventListener('storage', e => {
   if (v && v.uid === S.uid && v.tab !== TAB_ID) freezeTab();
 });
 
+/* 비상 버튼(과제 화면 오른쪽 위): 화면이 멈춘 것 같을 때 ① 3D → 2D 숫자 화면으로 바꾸고 다시 그림 ② 그래도 안 되면 다시 불러와 멈춘 단계부터 이어 하기 */
+let STUCK_N = 0;
+$('b-stuck').onclick = () => {
+  STUCK_N++; try { log("page", { note: "stuck_button_" + STUCK_N + (USE_GL() ? "_3d" : "_2d") }); persistLocal(); } catch (_) {}
+  if (USE_GL()) { glFail("user_stuck_button"); repaintPanel(); toast("2D 화면으로 바꿨습니다. 같은 과제를 그대로 이어서 진행해 주세요."); return; }
+  repaintPanel();
+  let d = $('stuck-dlg');
+  if (!d) {
+    d = document.createElement('div'); d.id = 'stuck-dlg'; d.className = 'net'; d.setAttribute('role', 'alertdialog'); d.style.zIndex = 55;
+    d.innerHTML = `<span>버튼을 눌러도 반응이 없다면 <b>다시 불러오기</b>를 눌러 주세요. 그다음 ‘시작하기’를 누르면 <b>멈춘 회차·단계부터 그대로 이어서</b> 진행됩니다. 지금까지 확정한 선택과 응답은 저장되어 있습니다.</span>
+      <div style="display:flex;gap:8px;margin-top:10px;width:100%"><button class="btn btn-ghost" id="b-stuck-close" type="button" style="min-height:44px;flex:1 1 0;padding:0 8px;white-space:nowrap">닫기</button><button class="btn btn-primary" id="b-stuck-reload" type="button" style="min-height:44px;flex:2 1 0;padding:0 8px;white-space:nowrap">다시 불러오기</button></div>`;
+    document.body.appendChild(d);
+    $('b-stuck-close').onclick = () => { d.hidden = true; repaintPanel(); };
+    $('b-stuck-reload').onclick = () => { try { log("page", { note: "stuck_reload" }); persistLocal(); } catch (_) {} S.leaveOK = true; GUARD = false; location.reload(); };
+  }
+  d.hidden = false;
+};
+new MutationObserver(() => { $('b-stuck').hidden = !$('s-trial').classList.contains('active'); }).observe($('s-trial'), { attributes: true, attributeFilter: ['class'] });
+
 $('b-start').onclick = async () => {
   const b = $('b-start'); b.disabled = true; b.textContent = "준비 중…"; $('start-err').textContent = "";
   try {
@@ -1433,6 +1533,18 @@ $('b-disagree').onclick = () => show('s-declined');
 /* 진행 중 처리 오류로 흐름이 끊기면(화면은 보이는데 아무 반응이 없는 상태) 그대로 두지 않고 복구 안내를 띄움.
    '다시 불러오기' → 시작하기 → 서버 기록 기준으로 멈춘 회차·단계부터 이어서 진행 (이미 확정된 선택·결과는 바뀌지 않음) */
 /* 아이폰 Safari: 3D 과제 화면에서 두 손가락으로 확대하면 고정된 정보 판이 화면 밖으로 밀려 눌리지 않을 수 있음 → 과제 화면에서는 확대 동작을 막음 */
+/* 아이폰 등에서 터치가 끝났는데 click이 오지 않는 경우(스크롤 멈춤으로 소비, 화면 갱신 지연 등): 버튼 위에서 짧게 누른 터치면 0.45초 뒤 대신 눌러 줌.
+   손가락을 움직였거나(10px 이상) 오래 누른 경우·이미 눌린 경우는 하지 않음 */
+let TS = null;
+document.addEventListener('touchstart', e => { const t = e.touches[0]; TS = t ? { x: t.clientX, y: t.clientY, at: performance.now() } : null; }, { passive: true, capture: true });
+document.addEventListener('touchend', e => {
+  const b = e.target && e.target.closest && e.target.closest('#s-trial button');
+  const t = e.changedTouches && e.changedTouches[0]; if (!b || !t || !TS || b.disabled) return;
+  if (Math.hypot(t.clientX - TS.x, t.clientY - TS.y) > 10 || performance.now() - TS.at > 800) return;
+  const r = b.getBoundingClientRect(); if (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom) return;
+  let clicked = false; const on = () => { clicked = true; }; b.addEventListener('click', on, { capture: true, once: true });
+  setTimeout(() => { b.removeEventListener('click', on, { capture: true }); if (!clicked && !b.disabled && b.isConnected && !b.closest('[hidden]')) { try { log("page", { note: "tap_fallback:" + (b.id || b.textContent.trim().slice(0, 12)) }); } catch (_) {} b.click(); } }, 450);
+}, { passive: true, capture: true });
 ['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => { if (document.body.classList.contains('gl-on')) e.preventDefault(); }, { passive: false }));
 window.addEventListener('unhandledrejection', e => {
   if (!GUARD) return;
@@ -1562,8 +1674,12 @@ $('b-practice').onclick = async () => {
   sceneOff();
   startComprehension();
 };
+let CUE_HTML = "";
 function resetTrialUI(){
+  CUE_HTML = "";
   ['st-h-locked','st-a','st-a-locked','st-res','st-t','practice-next-row'].forEach(id => $(id).hidden = true);
+  // 이전 회차에서 고른 버튼 표시가 남아 '눌린 채로 안 눌리는' 것처럼 보이지 않게 모두 초기화
+  document.querySelectorAll('#h-picks .pick, #a-picks .pick').forEach(b => { b.classList.remove('sel'); b.setAttribute('aria-pressed', 'false'); b.disabled = true; });
   $('st-h').hidden = false; $('b-h').disabled = true; $('b-a').disabled = true; $('b-t').disabled = true;
   $('res-body').innerHTML = ""; $('t-slider').innerHTML = ""; $('st-h-locked').textContent = ""; $('st-a-locked').textContent = "";
   $('a-own').textContent = "내 선택 사용";
@@ -1576,7 +1692,7 @@ async function runPractice(i){
   $('cue-grid').innerHTML = "";
   show('s-trial');
   await sceneApproach(`연습 ${i + 1}`, false);   // 연습: 드론 없음
-  $('cue-grid').innerHTML = cueHTML(p);
+  CUE_HTML = cueHTML(p); $('cue-grid').innerHTML = CUE_HTML; repaintPanel();
   const t0 = performance.now();
   const g = pickGroup($('h-picks'), () => $('b-h').disabled = false);
   await new Promise(res => $('b-h').onclick = res);
@@ -1740,14 +1856,18 @@ async function runTrial(n, resumed = false){
   $('tb-left').textContent = `회차 ${n} / ${CONFIG.nTrials}`;
   $('tb-right').textContent = `누적 배송시간 ${cumBefore(n)}초`;
   $('cue-grid').innerHTML = ""; show('s-trial');
+  $('st-h').hidden = true;   // 경로 정보가 화면에 나온 뒤에 1단계 버튼을 보여 줌(그 전에 누를 수 있는 것처럼 보이지 않게)
   // 현재 회차의 공개 단서만 요청 (서버가 이전 회차 T 확정 전에는 거부). 갈림길까지 이동하는 동안 받아 둠
   const tc0 = performance.now();
   const cueP = S.cues[t] ? Promise.resolve(S.cues[t]) : net("cue", () => BE.getCue(sess.template, t));
   await sceneApproach(`배송 ${n}`, true);
+  let cueSettled = false; cueP.then(() => cueSettled = true, () => cueSettled = true);
+  await painted();
+  if (!cueSettled) $('cue-grid').innerHTML = '<p class="muted loading-cue" style="grid-column:1/-1">경로 정보를 불러오는 중입니다… 잠시만 기다려 주세요.</p>';
   const cue = await cueP;
   S.cues[t] = cue;
   const netCue = Math.round(performance.now() - tc0);
-  $('cue-grid').innerHTML = cueHTML(cue);
+  CUE_HTML = cueHTML(cue); $('cue-grid').innerHTML = CUE_HTML; $('st-h').hidden = false; repaintPanel();
   await painted();   // 화면에 그려진 뒤부터 반응시간 측정
   const shownT = performance.now(), tsCue = isoLocal();
   log("cue", { trial: n, item_id: cue.item_id, net_ms: netCue, note: resumed ? "resumed" : "" });
@@ -1811,7 +1931,7 @@ async function runTrial(n, resumed = false){
   $('t-q').textContent = `4단계. ${TRUST_Q}`;
   $('st-t').hidden = false; $('b-t').disabled = true;
   const sl = mountSlider($('t-slider'), () => $('b-t').disabled = false);
-  try { $('st-res').scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {}
+  scrollInPanel($('st-res'), "start"); repaintPanel();
   await painted();
   const rShown = performance.now(), tsRes = isoLocal();
   await new Promise(res => $('b-t').onclick = () => { if (sl.value() !== null) res(); });
