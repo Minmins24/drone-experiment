@@ -542,21 +542,32 @@ $('b-void').onclick = async () => {
     await loadAlloc(); render();
   } catch (e) { msg('void-msg', "err", e.code === "changed" ? "그사이 이 seq의 배정이 바뀌었습니다. 새로고침 후 다시 확인해 주세요." : `처리하지 못했습니다 (${e.code || e.message}).`); }
 };
-/* ── 전화번호 중복 참여 막기: 이미 참여한 사람의 전화번호(SHA-256)를 phones에 등록(참가자 앱이 같은 번호를 막음) ── */
+/* ── 전화번호 중복 참여 막기(보안 규칙 v8.12): 실험을 끝까지 완료한 참가자의 번호(SHA-256)만 phones에 등록 ──
+   · 완료자 중 아직 등록 안 된 번호는 여기서 등록(이전 버전 완료자 포함)
+   · 완료하지 않은 사람 번호가 등록돼 있으면 지움(v8.14.0이 참가자 정보 단계에서 미리 등록했던 것 정리) → 중간에 그만둔 사람은 다시 참여 가능 */
 const PHONE_SALT = "drone-exp-phone-v1:";   // index.html과 같아야 함
 async function sha256hex(t){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
 async function syncPhones(){
   const el = $('phone-state'); if (!el) return;
+  const loadedAt = Date.now();
   try {
-    const have = new Set((await getDocs(collection(db, "phones"))).docs.map(d => d.id));
-    const list = [...SESS.map(x => ({ uid: x.uid, pid: x.pid, phone: x.phone, t: tsMs(x.created_at) })), ...PARTS.map(x => ({ uid: x.uid, pid: x.pid, phone: x.phone, t: tsMs(x.created_at) }))]
-      .filter(x => x.uid && x.phone && !isTest(x.pid)).sort((a, b) => (a.t || 0) - (b.t || 0));
-    const todo = new Map();
-    for (const x of list) { const dg = String(x.phone).replace(/\D/g, ""); if (!/^01\d{8,9}$/.test(dg)) continue; const h = await sha256hex(PHONE_SALT + dg); if (!have.has(h) && !todo.has(h)) todo.set(h, x.uid); }
-    for (let i = 0, arr = [...todo]; i < arr.length; i += 400) { const b = writeBatch(db); arr.slice(i, i + 400).forEach(([h, uid]) => b.set(doc(db, "phones", h), { uid, ts: serverTimestamp() })); await b.commit(); }
-    el.innerHTML = `<b>전화번호 중복 참여 막기</b>: 작동 중 · 등록된 번호 ${have.size + todo.size}개${todo.size ? ` (이번에 기존 참가자 ${todo.size}명 추가 등록)` : ""}. 같은 번호로 다시 들어오면 참가자 정보 단계에서 막힙니다. 잘못 막힌 분은 연락을 받으면 Firebase 콘솔의 <code>phones</code>에서 해당 문서를 지우면 됩니다.`;
+    const snap = await getDocs(collection(db, "phones"));
+    const have = new Map(snap.docs.map(d => [d.id, d.data()]));
+    const doneUids = new Set(PARTS.map(p => p.uid).filter(Boolean));
+    const add = new Map();
+    for (const p of [...PARTS].filter(p => p.uid && p.phone && !isTest(p.pid)).sort((a, b) => (tsMs(a.created_at) || 0) - (tsMs(b.created_at) || 0))) {
+      const dg = String(p.phone).replace(/\D/g, ""); if (!/^01\d{8,9}$/.test(dg)) continue;
+      const h = await sha256hex(PHONE_SALT + dg); if (!have.has(h) && !add.has(h)) add.set(h, p.uid);
+    }
+    // 완료자가 아닌 uid로 등록된 번호(10분 이상 지난 것만: 방금 완료해 목록에 아직 없는 사람은 건드리지 않음)
+    const drop = [...have].filter(([h, v]) => h !== "probe" && v && !doneUids.has(v.uid) && (tsMs(v.ts) || 0) < loadedAt - 10 * 60000).map(([h]) => h);
+    const ops = [...[...add].map(([h, uid]) => ["set", h, uid]), ...drop.map(h => ["del", h])];
+    for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db);
+      ops.slice(i, i + 400).forEach(([op, h, uid]) => op === "set" ? b.set(doc(db, "phones", h), { uid, ts: serverTimestamp() }) : b.delete(doc(db, "phones", h))); await b.commit(); }
+    const total = have.size - drop.length + add.size - (have.has("probe") ? 1 : 0);
+    el.innerHTML = `<b>전화번호 중복 참여 막기</b>: 작동 중 · <b>끝까지 완료한 참가자</b> 번호 ${total}개 등록${add.size ? ` (이번에 ${add.size}명 추가)` : ""}${drop.length ? ` · 완료하지 않은 사람 번호 ${drop.length}개 해제` : ""}. 완료한 번호로 다시 들어오면 참가자 정보 단계에서 "실험 참여가 이미 완료되었습니다"로 막히고, 중간에 그만둔 사람은 다시 참여할 수 있습니다.`;
   } catch (e) {
-    el.innerHTML = e && e.code === "permission-denied" ? `<span class="flag">전화번호 중복 참여 막기가 아직 꺼져 있습니다</span> — Firebase 콘솔에 보안 규칙 v8.11을 게시해 주세요.` : `전화번호 등록 확인 실패 (${esc((e && (e.code || e.message)) || "")})`;
+    el.innerHTML = e && e.code === "permission-denied" ? `<span class="flag">전화번호 중복 참여 막기가 아직 꺼져 있습니다</span> — Firebase 콘솔에 보안 규칙 v8.12를 게시해 주세요.` : `전화번호 등록 확인 실패 (${esc((e && (e.code || e.message)) || "")})`;
   }
 }
 async function loadAlloc(){

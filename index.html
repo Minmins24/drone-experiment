@@ -266,7 +266,7 @@ body.gl-on .route h3{margin-bottom:2px;font-size:16px}
   </div>
 </section>
 <section class="screen" id="s-done-already">
-  <div class="card"><h1>이미 참여를 마치셨습니다</h1><p>이 브라우저에서는 실험을 다시 진행할 수 없습니다. 참여해 주셔서 감사합니다.</p></div>
+  <div class="card"><h1>실험 참여가 이미 완료되었습니다</h1><p>이 실험에 이미 끝까지 참여하셨고, 결과도 저장되어 있습니다. 다시 진행하지 않으셔도 됩니다. 참여해 주셔서 감사합니다.</p></div>
 </section>
 <section class="screen" id="s-blocked">
   <div class="card"><h1 id="blocked-title">지금은 실험을 시작할 수 없습니다</h1><p id="blocked-text"></p></div>
@@ -876,19 +876,16 @@ function makeFirebaseBackend(){
       return api.uid;
     },
     async stimulusSha(){ const x = await getOne("meta", "stimulus"); return x ? x.sha256 : null; },
-    /* 같은 전화번호 중복 참여 막기: phones/{SHA-256} 문서를 처음 한 번만 만들 수 있음(보안 규칙)
-       "new" 처음 · "mine" 이 계정이 이미 등록(새로고침 등) · "skip" 새 규칙이 아직 게시 전(검사 생략) · 오류 code "dup" 다른 계정이 이미 등록 */
-    async reservePhone(h){
-      try { await F.fs.getDoc(d("phones", "probe")); }
+    /* 같은 전화번호 중복 참여 막기(보안 규칙 v8.12): phones/{전화번호 SHA-256}은 '실험을 끝까지 완료한 사람'만 등록됨
+       checkPhone: "done" 이미 완료한 번호 · "free" 등록 없음 · "skip" 새 규칙 게시 전(확인 생략)
+       registerPhone: 결과 저장이 끝난 뒤 한 번 등록(이미 있거나 규칙 전이면 조용히 넘어감) */
+    async checkPhone(h){
+      try { const x = await F.fs.getDoc(d("phones", h)); return x.exists() ? "done" : "free"; }
       catch (e) { if (e && e.code === "permission-denied") return "skip"; throw e; }
-      const ref = d("phones", h);
-      try { await F.fs.setDoc(ref, { uid: api.uid, ts: F.fs.serverTimestamp() }); return "new"; }
-      catch (e) {
-        if (!(e && e.code === "permission-denied")) throw e;   // 일시 오류는 net()이 다시 시도(응답 유실 뒤 재시도면 아래 'mine'으로 확인됨)
-        try { const x = await F.fs.getDoc(ref); if (x.exists() && x.data().uid === api.uid) return "mine"; }
-        catch (e2) { if (!(e2 && e2.code === "permission-denied")) throw e2; }
-        throw Object.assign(new Error("dup"), { code: "dup" });
-      }
+    },
+    async registerPhone(h){
+      try { await F.fs.setDoc(d("phones", h), { uid: api.uid, ts: F.fs.serverTimestamp() }); return "ok"; }
+      catch (e) { return "no:" + ((e && e.code) || "err"); }
     },
     async getSession(){ return await getOne("sessions", api.uid); },
     async allocInfo(){ const x = await F.fs.getDoc(d("meta", "alloc")); return x.exists() ? x.data() : null; },
@@ -998,9 +995,8 @@ function makeMockBackend(){
     kind: "mock", uid: null,
     async init(){ if (!st.uid) { st.uid = "mock-" + Math.random().toString(36).slice(2, 10); persist(); } api.uid = st.uid; return api.uid; },
     async stimulusSha(){ return CONFIG.stimulusSha256; },
-    async reservePhone(h){ await net(); st.phones = st.phones || {}; const x = st.phones[h];
-      if (!x) { st.phones[h] = { uid: api.uid, ts: Date.now() }; persist(); return "new"; }
-      if (x.uid === api.uid) return "mine"; throw Object.assign(new Error("dup"), { code: "dup" }); },
+    async checkPhone(h){ await net(); return (st.phones || {})[h] ? "done" : "free"; },
+    async registerPhone(h){ await net(); st.phones = st.phones || {}; if (st.phones[h] || !(st.sessions[api.uid] && st.sessions[api.uid].finished)) return "no"; st.phones[h] = { uid: api.uid, ts: Date.now() }; persist(); return "ok"; },
     async getSession(){ await net(); return st.sessions[api.uid] || null; },
     async allocInfo(){ await net(); return JSON.parse(JSON.stringify(st.alloc)); },
     async markVisit(){},
@@ -1515,7 +1511,7 @@ $('b-start').onclick = async () => {
     restoreLocal();
     if (sess) {
       S.session = sess; S.pid = sess.pid || S.pid;
-      if (sess.finished) { show('s-done-already'); return; }
+      if (sess.finished) { if (!S.info.phone && sess.phone) S.info.phone = sess.phone; registerDonePhone(); show('s-done-already'); return; }
       log("page", { note: "resume_found" }); show('s-resume'); return;
     }
     if (CONFIG.paused && !PREVIEW) { block("지금은 실험 참여를 잠시 멈춘 상태입니다", `연구자가 실험 참여를 잠시 중단했습니다. 다시 열리면 같은 주소로 참여하실 수 있습니다. 문의: ${CONFIG.consent.contact}`); return; }
@@ -1601,6 +1597,10 @@ document.querySelectorAll('#s-info .opts').forEach(g => g.addEventListener('clic
 }));
 $('i-pid').addEventListener('input', e => e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4));
 $('i-phone').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d-]/g, ''));
+async function registerDonePhone(){
+  try { const dg = String(S.info.phone || "").replace(/\D/g, ""); if (!/^01\d{8,9}$/.test(dg) || !(window.crypto && crypto.subtle)) return;
+    const r = await BE.registerPhone(await sha256hex(PHONE_SALT + dg)); log("page", { note: "phone_register_" + r }); } catch (_) {}
+}
 async function sha256hex(t){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
 const PHONE_SALT = "drone-exp-phone-v1:";   // admin.html과 같아야 함
 let INFO_BUSY = false;
@@ -1616,20 +1616,20 @@ $('b-info').onclick = async () => {
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
   for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["ai_knowledge_10","AI에 대한 나의 지식과 이해 정도를"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
-  // 같은 전화번호로 이미 참여(다른 브라우저·기기 포함)했는지 서버에서 확인 → 배정 전에 막아 조건 비율이 흐트러지지 않게
+  // 이 전화번호로 실험을 '끝까지 완료'한 기록이 있는지 확인(다른 브라우저·기기 포함) → 있으면 배정 전에 막음
+  //   중간에 그만둔 사람의 번호는 등록되지 않으므로 다시 참여할 수 있음
   if (window.crypto && crypto.subtle) {
     INFO_BUSY = true; $('b-info').disabled = true;
     try {
-      const r = await net("phone", async () => BE.reservePhone(await sha256hex(PHONE_SALT + phone)), { fatal: c => c === "dup" });
+      const r = await net("phone", async () => BE.checkPhone(await sha256hex(PHONE_SALT + phone)));
       log("page", { note: "phone_" + r });
-    } catch (e) {
-      if (e && e.code === "dup") {
-        log("page", { note: "phone_dup" }); persistLocal();
-        block("이미 참여하신 기록이 있습니다", `입력하신 전화번호로 이미 이 실험에 참여하셨습니다. 이 연구는 한 분당 한 번만 참여할 수 있어 다시 진행할 수 없습니다. 참여해 주셔서 감사합니다. 착오라고 생각되시면 연구자(${MAIL_TO})에게 문의해 주세요.`);
+      if (r === "done") {
+        persistLocal();
+        block("실험 참여가 이미 완료되었습니다", `입력하신 전화번호로 이 실험에 이미 끝까지 참여하셨고, 결과도 저장되어 있습니다. 이 연구는 한 분당 한 번만 참여할 수 있어 다시 진행하지 않으셔도 됩니다. 참여해 주셔서 감사합니다. 문의: ${MAIL_TO}`);
         return;
       }
-      return;
-    } finally { INFO_BUSY = false; $('b-info').disabled = false; }
+    } catch (e) { return; }
+    finally { INFO_BUSY = false; $('b-info').disabled = false; }
   } else log("page", { note: "phone_check_no_crypto" });
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
@@ -2196,6 +2196,7 @@ async function finish(){
     if (saved) {
       window.onbeforeunload = null; S.leaveOK = true; GUARD = false; $('retry-row').hidden = true; clearInterval(timer);
       endState(true);
+      registerDonePhone();   // 끝까지 완료한 사람만 번호 등록(같은 번호 재참여 막기)
     } else {
       endState(false);   // 창이 열려 있는 동안 자동 재전송도 계속됨
       if (tries === 40) { clearInterval(timer); timer = setInterval(attempt, 60000); }   // 10분이 지나면 1분 간격으로, 창이 열려 있는 동안 계속

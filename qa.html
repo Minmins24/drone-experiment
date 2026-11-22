@@ -110,13 +110,11 @@ $('b-run').onclick = async () => {
     await expectDeny("다른 이름으로 결과 문서 만들기(세션당 1개 규칙)", () => setDoc(doc(db, "participants", "x_" + uid), { pid: "0000", phone: "", uid, slot: k, seq: k, alloc: "v3", condition: row.condition, template: row.template, app_version: "qa", summary: {}, summary_cols: [], trials_cols: [], trials_csv: "", events_cols: [], events_csv: "", created_at: serverTimestamp() }));
     await expectOk("첫 방문 시각 기록", () => setDoc(doc(db, "visits", uid), { app_version: "qa", ts: serverTimestamp() }));
     await expectDeny("첫 방문 시각 다시 쓰기", () => setDoc(doc(db, "visits", uid), { app_version: "qa", ts: serverTimestamp() }));
-    // v8.11 규칙: 같은 전화번호 중복 참여 막기(phones)
+    // v8.12 규칙: 같은 전화번호 중복 참여 막기(phones) — 끝까지 완료한 사람만 번호 등록, 참여 시작 시에는 등록 여부만 읽기
     { const hx = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("qa-check:" + uid)))].map(x => x.toString(16).padStart(2, "0")).join("");
-      await expectOk("[v8.11] 전화번호 막기 규칙 게시 확인(probe 읽기)", () => getDoc(doc(db, "phones", "probe")));
-      await expectOk("[v8.11] 전화번호(해시) 처음 등록", () => setDoc(doc(db, "phones", hx), { uid, ts: serverTimestamp() }));
-      await expectOk("[v8.11] 자기 등록 확인 읽기", async () => (await getDoc(doc(db, "phones", hx))).data(), d => d && d.uid === uid ? true : "uid 다름");
-      await expectDeny("[v8.11] 같은 번호 다시 등록(중복 참여)", () => setDoc(doc(db, "phones", hx), { uid, ts: serverTimestamp() }));
-      await expectDeny("[v8.11] 해시가 아닌 id로 등록", () => setDoc(doc(db, "phones", "01012345678"), { uid, ts: serverTimestamp() })); }
+      await expectOk("[v8.12] 전화번호 완료 기록 확인(읽기)", async () => await getDoc(doc(db, "phones", hx)), x => x.exists() ? "이미 있음(예상: 없음)" : true);
+      await expectDeny("[v8.12] 완료하지 않은 상태에서 번호 등록", () => setDoc(doc(db, "phones", hx), { uid, ts: serverTimestamp() }));
+      await expectDeny("[v8.12] 해시가 아닌 id로 등록", () => setDoc(doc(db, "phones", "01012345678"), { uid, ts: serverTimestamp() })); }
     const T = sess.template, C = sess.condition, other = CONDS.find(c => c !== C), otherT = TEMPLATES.find(t => t !== T);
     await expectDeny("배정된 조건·템플릿을 다른 값으로 바꾸기", () => updateDoc(sref, { condition: other }));
     await expectDeny("T0 다시 바꾸기", () => updateDoc(sref, { T0: 60 }));
