@@ -876,6 +876,20 @@ function makeFirebaseBackend(){
       return api.uid;
     },
     async stimulusSha(){ const x = await getOne("meta", "stimulus"); return x ? x.sha256 : null; },
+    /* 같은 전화번호 중복 참여 막기: phones/{SHA-256} 문서를 처음 한 번만 만들 수 있음(보안 규칙)
+       "new" 처음 · "mine" 이 계정이 이미 등록(새로고침 등) · "skip" 새 규칙이 아직 게시 전(검사 생략) · 오류 code "dup" 다른 계정이 이미 등록 */
+    async reservePhone(h){
+      try { await F.fs.getDoc(d("phones", "probe")); }
+      catch (e) { if (e && e.code === "permission-denied") return "skip"; throw e; }
+      const ref = d("phones", h);
+      try { await F.fs.setDoc(ref, { uid: api.uid, ts: F.fs.serverTimestamp() }); return "new"; }
+      catch (e) {
+        if (!(e && e.code === "permission-denied")) throw e;   // 일시 오류는 net()이 다시 시도(응답 유실 뒤 재시도면 아래 'mine'으로 확인됨)
+        try { const x = await F.fs.getDoc(ref); if (x.exists() && x.data().uid === api.uid) return "mine"; }
+        catch (e2) { if (!(e2 && e2.code === "permission-denied")) throw e2; }
+        throw Object.assign(new Error("dup"), { code: "dup" });
+      }
+    },
     async getSession(){ return await getOne("sessions", api.uid); },
     async allocInfo(){ const x = await F.fs.getDoc(d("meta", "alloc")); return x.exists() ? x.data() : null; },
     async markVisit(){ try { await F.fs.setDoc(d("visits", api.uid), { app_version: CONFIG.appVersion, ts: F.fs.serverTimestamp() }); } catch (e) {} },   // 첫 방문 서버 시각(소요시간 계산용). 이미 있으면 거부됨(무시)
@@ -943,7 +957,7 @@ function makeFirebaseBackend(){
    - 이미 seq를 받은 사람(who에 있음)은 항상 같은 seq (재접속·새로고침에도 새 seq를 주지 않음)
    - 배정 후 slotTimeoutMin분 안에 끝나지 않은 seq가 있으면 가장 작은 번호를 같은 조건·템플릿으로 재발급 (noReuse면 건너뜀)
    - 아니면 다음 seq(n + 1). 300행을 모두 썼으면 closed (배정표 밖의 임의 배정은 하지 않음) */
-const tsMs = v => v == null ? NaN : typeof v.toMillis === "function" ? v.toMillis() : typeof v.toDate === "function" ? v.toDate().getTime() : (v.__ts ?? Number(v));
+const tsMs = v => v == null ? NaN : typeof v.toMillis === "function" ? v.toMillis() : typeof v.toDate === "function" ? v.toDate().getTime() : v instanceof Date ? v.getTime() : typeof v === "string" ? Date.parse(v) : (v.__ts ?? Number(v));
 function allocPlan(a, uid, now, noReuse = false){
   const total = Number(a.total) || 0, n = Number(a.n) || 0, slots = a.slots || {}, who = a.who || {};
   // 이미 seq를 받은 사람(새로고침·재접속): 같은 seq. owner=false면 세션을 만들기 전에 그 seq가 다른 사람에게 재발급된 경우
@@ -984,6 +998,9 @@ function makeMockBackend(){
     kind: "mock", uid: null,
     async init(){ if (!st.uid) { st.uid = "mock-" + Math.random().toString(36).slice(2, 10); persist(); } api.uid = st.uid; return api.uid; },
     async stimulusSha(){ return CONFIG.stimulusSha256; },
+    async reservePhone(h){ await net(); st.phones = st.phones || {}; const x = st.phones[h];
+      if (!x) { st.phones[h] = { uid: api.uid, ts: Date.now() }; persist(); return "new"; }
+      if (x.uid === api.uid) return "mine"; throw Object.assign(new Error("dup"), { code: "dup" }); },
     async getSession(){ await net(); return st.sessions[api.uid] || null; },
     async allocInfo(){ await net(); return JSON.parse(JSON.stringify(st.alloc)); },
     async markVisit(){},
@@ -1584,7 +1601,11 @@ document.querySelectorAll('#s-info .opts').forEach(g => g.addEventListener('clic
 }));
 $('i-pid').addEventListener('input', e => e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4));
 $('i-phone').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d-]/g, ''));
-$('b-info').onclick = () => {
+async function sha256hex(t){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+const PHONE_SALT = "drone-exp-phone-v1:";   // admin.html과 같아야 함
+let INFO_BUSY = false;
+$('b-info').onclick = async () => {
+  if (INFO_BUSY) return;
   const pid = $('i-pid').value.trim(), age = Number($('i-age').value), err = $('info-err'), phone = $('i-phone').value.replace(/\D/g, '');
   if (!/^\d{4}$/.test(pid)) return err.textContent = "전화번호 뒷자리 4자리를 숫자로 입력해 주세요. (예: 5678)";
   if (!/^01\d{8,9}$/.test(phone)) return err.textContent = "전화번호를 정확히 입력해 주세요. (예: 010-1234-5678)";
@@ -1595,6 +1616,21 @@ $('b-info').onclick = () => {
     if (S.info.age_group !== g) return err.textContent = `입력한 만 나이(${age}세)와 선택한 연령대가 맞지 않습니다. 다시 확인해 주세요.`; }
   for (const [k, label] of [["gender","성별을"],["edu","최종 학력을"],["ai_use_freq","AI 제품·서비스 사용 빈도를"],["ai_knowledge_10","AI에 대한 나의 지식과 이해 정도를"],["exp_drone","드론 경험을"]]) if (!S.info[k]) return err.textContent = `${label} 선택해 주세요.`;
   err.textContent = "";
+  // 같은 전화번호로 이미 참여(다른 브라우저·기기 포함)했는지 서버에서 확인 → 배정 전에 막아 조건 비율이 흐트러지지 않게
+  if (window.crypto && crypto.subtle) {
+    INFO_BUSY = true; $('b-info').disabled = true;
+    try {
+      const r = await net("phone", async () => BE.reservePhone(await sha256hex(PHONE_SALT + phone)), { fatal: c => c === "dup" });
+      log("page", { note: "phone_" + r });
+    } catch (e) {
+      if (e && e.code === "dup") {
+        log("page", { note: "phone_dup" }); persistLocal();
+        block("이미 참여하신 기록이 있습니다", `입력하신 전화번호로 이미 이 실험에 참여하셨습니다. 이 연구는 한 분당 한 번만 참여할 수 있어 다시 진행할 수 없습니다. 참여해 주셔서 감사합니다. 착오라고 생각되시면 연구자(${MAIL_TO})에게 문의해 주세요.`);
+        return;
+      }
+      return;
+    } finally { INFO_BUSY = false; $('b-info').disabled = false; }
+  } else log("page", { note: "phone_check_no_crypto" });
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
   for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge_10"]) log("survey", { item_id: k, value: S.info[k] });
