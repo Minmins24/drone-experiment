@@ -875,6 +875,12 @@ function makeFirebaseBackend(){
       api.uid = user && user.isAnonymous ? user.uid : (await withTimeout(F.authMod.signInAnonymously(F.auth), 20000)).user.uid;
       return api.uid;
     },
+    /* 새 익명 계정으로 바꾸기(파일럿 참가자가 같은 브라우저로 본 실험에 다시 참여할 때). 파일럿 기록은 그대로 남음 */
+    async newIdentity(){
+      try { await F.authMod.signOut(F.auth); } catch (_) {}
+      api.uid = (await withTimeout(F.authMod.signInAnonymously(F.auth), 20000)).user.uid;
+      return api.uid;
+    },
     async stimulusSha(){ const x = await getOne("meta", "stimulus"); return x ? x.sha256 : null; },
     /* 같은 전화번호 중복 참여 막기(보안 규칙 v8.12): phones/{전화번호 SHA-256}은 '실험을 끝까지 완료한 사람'만 등록됨
        checkPhone: "done" 이미 완료한 번호 · "free" 등록 없음 · "skip" 새 규칙 게시 전(확인 생략)
@@ -994,6 +1000,7 @@ function makeMockBackend(){
   const api = {
     kind: "mock", uid: null,
     async init(){ if (!st.uid) { st.uid = "mock-" + Math.random().toString(36).slice(2, 10); persist(); } api.uid = st.uid; return api.uid; },
+    async newIdentity(){ await net(); st.uid = "mock-" + Math.random().toString(36).slice(2, 10); persist(); api.uid = st.uid; return api.uid; },
     async stimulusSha(){ return CONFIG.stimulusSha256; },
     async checkPhone(h){ await net(); return (st.phones || {})[h] ? "done" : "free"; },
     async registerPhone(h){ await net(); st.phones = st.phones || {}; if (st.phones[h] || !(st.sessions[api.uid] && st.sessions[api.uid].finished)) return "no"; st.phones[h] = { uid: api.uid, ts: Date.now() }; persist(); return "ok"; },
@@ -1507,7 +1514,15 @@ $('b-start').onclick = async () => {
     claimTab();   // 이 탭이 지금 진행하는 탭(같은 계정의 다른 탭은 멈춤)
     const sha = await net("stimulus", () => BE.stimulusSha());
     if (sha !== CONFIG.stimulusSha256) { block("지금은 실험을 시작할 수 없습니다", "실험 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (자극 확인 실패)"); return; }
-    const sess = await net("session", () => BE.getSession());
+    let sess = await net("session", () => BE.getSession());
+    // 파일럿(본 실험 배정표 v3 이전) 기록이 있는 브라우저: 본 실험에는 새 참가자로 다시 참여 → 새 익명 계정으로 시작
+    //   (파일럿 세션·결과는 그대로 두고, 이어하기·'이미 완료' 화면으로 가지 않음)
+    if (sess && sess.alloc !== CONFIG.alloc.version) {
+      const was = sess.finished ? "done" : "open";
+      S.uid = await net("init_new", () => BE.newIdentity(), { timeout: 30000 });
+      claimTab(); log("page", { note: `pilot_session_${was}_new_uid` });
+      sess = await net("session", () => BE.getSession());   // 새 계정이므로 보통 없음
+    }
     restoreLocal();
     if (sess) {
       S.session = sess; S.pid = sess.pid || S.pid;
@@ -1598,6 +1613,7 @@ document.querySelectorAll('#s-info .opts').forEach(g => g.addEventListener('clic
 $('i-pid').addEventListener('input', e => e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4));
 $('i-phone').addEventListener('input', e => e.target.value = e.target.value.replace(/[^\d-]/g, ''));
 async function registerDonePhone(){
+  if (!S.session || S.session.alloc !== CONFIG.alloc.version) return;   // 본 실험(v3 배정표) 완료자만 등록(파일럿은 본 실험 참여 가능)
   try { const dg = String(S.info.phone || "").replace(/\D/g, ""); if (!/^01\d{8,9}$/.test(dg) || !(window.crypto && crypto.subtle)) return;
     const r = await BE.registerPhone(await sha256hex(PHONE_SALT + dg)); log("page", { note: "phone_register_" + r }); } catch (_) {}
 }
