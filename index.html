@@ -585,7 +585,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.17.1",
+  appVersion: "v8.17.2",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -1442,12 +1442,12 @@ const LKEY = () => "droneExp_v7_state_" + S.uid;
 function persistLocal(){
   if (!S.uid) return;
   try { localStorage.setItem(LKEY(), JSON.stringify({ pid: S.pid, info: S.info, survey: S.survey, comp: S.comp, events: S.events.slice(-600), eventIndex: S.eventIndex,
-    preDone: S.preDone, postIdx: S.postIdx, postDone: S.postDone, finishId: S.finishId, notes: S.notes, allocPrev: S.allocPrev || null })); } catch (e) {}
+    preDone: S.preDone, preIdx: S.preIdx || 0, postIdx: S.postIdx, postDone: S.postDone, finishId: S.finishId, notes: S.notes, allocPrev: S.allocPrev || null })); } catch (e) {}
 }
 function restoreLocal(){
   try { const x = JSON.parse(localStorage.getItem(LKEY()) || "null"); if (!x) return false;
     Object.assign(S, { pid: x.pid || "", info: x.info || {}, survey: x.survey || {}, comp: x.comp || S.comp, events: x.events || [], eventIndex: x.eventIndex || 0,
-      preDone: !!x.preDone, postIdx: x.postIdx || 0, postDone: !!x.postDone, finishId: x.finishId || null, notes: x.notes || [], allocPrev: x.allocPrev || null }); return true;
+      preDone: !!x.preDone, preIdx: x.preIdx || 0, postIdx: x.postIdx || 0, postDone: !!x.postDone, finishId: x.finishId || null, notes: x.notes || [], allocPrev: x.allocPrev || null }); return true;
   } catch (e) { return false; }
 }
 function show(id){
@@ -1620,12 +1620,12 @@ window.addEventListener('storage', e => {
 let STUCK_N = 0;
 $('b-stuck').onclick = () => {
   STUCK_N++; try { log("page", { note: "stuck_button_" + STUCK_N + (USE_GL() ? "_3d" : "_2d") }); persistLocal(); } catch (_) {}
-  if (USE_GL()) { glFail("user_stuck_button"); repaintPanel(); toast("2D 화면으로 바꿨습니다. 같은 과제를 그대로 이어서 진행해 주세요."); return; }
+  if (USE_GL() && $('s-trial').classList.contains('active')) { glFail("user_stuck_button"); repaintPanel(); toast("2D 화면으로 바꿨습니다. 같은 과제를 그대로 이어서 진행해 주세요."); return; }
   repaintPanel();
   let d = $('stuck-dlg');
   if (!d) {
     d = document.createElement('div'); d.id = 'stuck-dlg'; d.className = 'net'; d.setAttribute('role', 'alertdialog'); d.style.zIndex = 55;
-    d.innerHTML = `<span>버튼을 눌러도 반응이 없다면 <b>다시 불러오기</b>를 눌러 주세요. 그다음 ‘시작하기’를 누르면 <b>멈춘 회차·단계부터 그대로 이어서</b> 진행됩니다. 지금까지 확정한 선택과 응답은 저장되어 있습니다.</span>
+    d.innerHTML = `<span>버튼을 눌러도 반응이 없다면 <b>다시 불러오기</b>를 눌러 주세요. 그다음 ‘시작하기’를 누르면 <b>멈춘 단계부터 그대로 이어서</b> 진행됩니다. 지금까지 확정한 선택과 응답은 저장되어 있습니다.</span>
       <div style="display:flex;gap:8px;margin-top:10px;width:100%"><button class="btn btn-ghost" id="b-stuck-close" type="button" style="min-height:44px;flex:1 1 0;padding:0 8px;white-space:nowrap">닫기</button><button class="btn btn-primary" id="b-stuck-reload" type="button" style="min-height:44px;flex:2 1 0;padding:0 8px;white-space:nowrap">다시 불러오기</button></div>`;
     document.body.appendChild(d);
     $('b-stuck-close').onclick = () => { d.hidden = true; repaintPanel(); };
@@ -1633,7 +1633,17 @@ $('b-stuck').onclick = () => {
   }
   d.hidden = false;
 };
-new MutationObserver(() => { $('b-stuck').hidden = !$('s-trial').classList.contains('active'); }).observe($('s-trial'), { attributes: true, attributeFilter: ['class'] });
+/* '화면이 멈췄나요?' 버튼: 과제 화면에서는 항상, 그 밖의 진행 화면에서는 같은 화면에 60초 넘게 머물면 표시(누르면 다시 불러와 멈춘 단계부터 이어 하기) */
+const STUCK_SCREENS = ["s-ai-intro", "s-survey", "s-scenario", "s-cue-intro", "s-practice-intro", "s-comp", "s-comp-review", "s-procedure", "s-trust0", "s-debrief"];
+let STUCK_AT = 0, STUCK_SCR = "";
+function stuckTick(){
+  const a = document.querySelector('.screen.active'), id = a ? a.id : "";
+  if (id !== STUCK_SCR) { STUCK_SCR = id; STUCK_AT = Date.now(); }
+  const show = id === "s-trial" || (STUCK_SCREENS.includes(id) && Date.now() - STUCK_AT > 60000 && !!S.uid);
+  if ($('b-stuck').hidden === show) $('b-stuck').hidden = !show;
+}
+{ const mo = new MutationObserver(stuckTick); document.querySelectorAll('.screen').forEach(el => mo.observe(el, { attributes: true, attributeFilter: ['class'] })); }
+setInterval(stuckTick, 5000);
 
 $('b-start').onclick = async () => {
   const b = $('b-start'); b.disabled = true; b.textContent = "준비 중…"; $('start-err').textContent = "";
@@ -1665,7 +1675,7 @@ $('b-start').onclick = async () => {
     if (!alloc || !(Number(alloc.total) > 0)) { block("지금은 실험을 시작할 수 없습니다", `실험 배정 자료가 아직 준비되지 않았습니다. 실험자에게 문의해 주세요. (문의: ${CONFIG.consent.contact})`); return; }
     { const pl = allocPlan(alloc, S.uid, Date.now()); if (pl.closed || pl.tentative) { showClosed(); return; } }   // 시작 화면 점검: 새 seq·재발급 자리가 없으면 마감(진행 중인 seq만 남은 경우 포함)
     // 본 과제 시작(T0) 직전까지 모두 마치고 배정 전에 창이 닫힌 경우(예: 서버 연결 문제): 이 기기에 남은 응답으로 T0부터 이어서
-    if (preReadyLocal()) { S.localResume = true; log("page", { note: "resume_local_preT0" }); show('s-resume'); return; }
+    { const st = localStage(); if (st) { S.localResume = st; log("page", { note: "resume_local_" + st }); show('s-resume'); return; } }
     setPhase("consent"); show('s-consent');
   } catch (e) { if (!(e && e.code === "quota_block")) throw e; }
   finally { if (!BAD_ORIGIN) { b.disabled = false; b.textContent = "시작하기"; } }
@@ -1677,7 +1687,29 @@ function preReadyLocal(){
   try { return !S.session && !!S.pid && !!(S.info && S.info.phone) && S.preDone && preStatus(S.survey) === "complete" && S.comp && S.comp.attempts > 0 && (S.comp.passed || S.comp.ack); }
   catch (_) { return false; }
 }
-$('b-resume').onclick = single(async () => { armLeaveGuard(); if (!S.session && S.localResume) { showProcedure(); return; } await resume(); });
+/* 배정 전 단계 이어하기: 창을 닫거나 새로고침해도 이 기기에 남은 응답으로 멈춘 단계부터 (참가자 정보 입력 뒤부터)
+   pre = 실험 전 설문 n번째 블록 / scenario = 과제 배경 / cue = 경로 정보 안내·연습 / comp = 이해 확인 / t0 = 절차 안내 → T0 */
+function localStage(){
+  try {
+    if (S.session || !S.pid || !(S.info && S.info.phone && S.info.age)) return null;
+    if (preReadyLocal()) return "t0";
+    if (preStatus(S.survey) === "complete") return S.comp && S.comp.attempts > 0 ? "comp" : "cue";
+    if (S.preDone) return "scenario";
+    return "pre";
+  } catch (_) { return null; }
+}
+$('b-resume').onclick = single(async () => {
+  armLeaveGuard();
+  if (!S.session && S.localResume) {
+    const st = S.localResume; S.localResume = null;
+    if (st === "t0") return showProcedure();
+    if (st === "comp") { setPhase("comprehension"); return renderComp(true); }
+    if (st === "cue") return showCueIntro();
+    if (st === "scenario") return showScenario();
+    return startPreSurvey(S.preIdx || 0);
+  }
+  await resume();
+});
 
 /* =====================================================================
    2. 동의 · 3. 참가자 정보
@@ -1800,10 +1832,11 @@ $('b-info').onclick = async () => {
   for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge_10"]) log("survey", { item_id: k, value: S.info[k] });
   setPhase("ai_intro"); show('s-ai-intro');   // v8.6.0: 참가자 정보 다음, 사전 설문 앞에 AI·자동화 시스템 소개
 };
-$('b-ai-intro').onclick = () => {
+function startPreSurvey(idx = 0){
   setPhase("pre_survey");
-  runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); }, 0, { offset: 0, total: PRE_SURVEY.length + DRONE_PRE_SURVEY.length });
-};
+  runSurvey(PRE_SURVEY, "실험 전 설문", () => { S.preDone = true; persistLocal(); showScenario(); }, Math.max(0, Math.min(idx, PRE_SURVEY.length - 1)), { offset: 0, total: PRE_SURVEY.length + DRONE_PRE_SURVEY.length });
+}
+$('b-ai-intro').onclick = () => { S.preIdx = 0; persistLocal(); startPreSurvey(0); };
 
 /* =====================================================================
    설문 (사전·사후 공용)
@@ -1850,6 +1883,8 @@ function renderSurvey(){
     blk.items.forEach(it => { const v = ans[it.id] ?? ""; S.survey[it.id] = v; log("survey", { item_id: it.id, value: v, rt_ms: rt }); });
     SV.idx++;
     if (SV.blocks === POST_SURVEY) { S.postIdx = SV.idx; persistLocal(); }
+    else if (SV.blocks === PRE_SURVEY) { S.preIdx = SV.idx; persistLocal(); }
+    else persistLocal();
     if (SV.idx < SV.blocks.length) renderSurvey(); else SV.done();
   };
 }
