@@ -144,7 +144,9 @@ td.na{color:#b0b6b1}
           <input type="search" id="f-q" placeholder="뒷자리·전화번호 검색">
           <label class="sub"><input type="checkbox" id="f-test"> 시험 자료(뒷자리 0000) 포함</label>
           <button class="btn" id="b-reload">새로고침</button>
+          <button class="btn" id="b-reload-full" title="이 브라우저에 보관한 기록을 버리고 서버에서 처음부터 모두 다시 읽습니다(읽기 사용량이 큽니다)">전체 다시 읽기</button>
         </div>
+        <p class="sub" id="read-count" style="margin:6px 0 0"></p>
       </div>
       <div class="row" style="margin-top:10px">
         <button class="btn primary" id="b-dl-total" title="참가자 정보·배정·모든 척도·연습·과제 요약·사후 설문·진행 기록 요약·20회차 자료를 한 파일에">전체(total) CSV</button>
@@ -197,7 +199,7 @@ const PUBLIC = ["template","trial","item_id","left_base","left_delay_pct","left_
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, query, orderBy, getDocs, deleteDoc, doc, getDoc, setDoc, writeBatch, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, query, orderBy, where, Timestamp, getDocs, deleteDoc, doc, getDoc, setDoc, writeBatch, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app), db = getFirestore(app);
@@ -369,23 +371,48 @@ async function loadStim(){
 
 /* ====================== 2·3. 배정·기록 ====================== */
 const TCACHE = "drone_admin_trials_v1_" + location.pathname + "_";
+/* ── 서버 무료 사용량(하루 읽기 5만 건) 절약: 한 번 읽은 기록은 이 브라우저에 보관하고, 새로고침 때는 '새로 생기거나 바뀐 것'만 읽음 ──
+   · 방문(visits)·배정 기록(alloc_log)·전화번호(phones): 만들어진 뒤 바뀌지 않으므로 서버 시각(ts)이 최근(마지막으로 본 시각 − 10분 이후)인 것만 읽음
+   · 진행 중 세션의 회차 기록: 마지막으로 본 회차부터만 다시 읽음(앞 회차는 확정되어 바뀌지 않음 — 보안 규칙)
+   · '전체 다시 읽기'를 누르면 보관한 것을 버리고 처음부터 모두 읽음 */
+const ICACHE = "drone_admin_inc_v1_" + location.pathname + "_";
+let READS = 0;
+const toMsDeep = v => { if (v && typeof v === "object") { if (typeof v.toMillis === "function") return { __ts: v.toMillis() }; if (Array.isArray(v)) return v.map(toMsDeep); const o = {}; for (const k of Object.keys(v)) o[k] = toMsDeep(v[k]); return o; } return v; };
+function icGet(name){ try { const c = JSON.parse(localStorage.getItem(ICACHE + name) || "null"); if (c && c.v === 1 && c.docs) return c; } catch (_) {} return { v: 1, max: 0, docs: {} }; }
+function icPut(name, c){ try { localStorage.setItem(ICACHE + name, JSON.stringify(c)); } catch (_) {} }
+function icDrop(name, ids){ const c = icGet(name); (ids || []).forEach(id => delete c.docs[id]); icPut(name, c); }
+function icClearAll(){ try { Object.keys(localStorage).filter(k => k.startsWith(ICACHE) || k.startsWith(TCACHE)).forEach(k => localStorage.removeItem(k)); } catch (_) {} for (const k of Object.keys(TRIALS)) delete TRIALS[k]; }
+async function incCol(name){
+  const c = icGet(name), MARGIN = 10 * 60000;
+  const q = c.max ? query(collection(db, name), where("ts", ">=", Timestamp.fromMillis(c.max - MARGIN))) : collection(db, name);
+  const snap = await getDocs(q); READS += Math.max(1, snap.size);
+  snap.forEach(d => { const x = toMsDeep(d.data()); c.docs[d.id] = x; const m = tsMs(x.ts); if (Number.isFinite(m) && m > c.max) c.max = m; });
+  icPut(name, c); return c.docs;
+}
+async function trialsOf(uid, finished){
+  const key = TCACHE + uid; let c = null; try { c = JSON.parse(localStorage.getItem(key) || "null"); } catch (_) {}
+  if (c && c.v === 1 && c.n >= 1 && finished && c.fin) return c.t;
+  const have = c && c.v === 1 && c.t ? c.t : {}, maxT = Math.max(0, ...Object.values(have).map(x => Number(x.trial) || 0));
+  const q = maxT ? query(collection(db, "sessions", uid, "trials"), where("trial", ">=", maxT)) : collection(db, "sessions", uid, "trials");
+  const snap = await getDocs(q); READS += Math.max(1, snap.size);
+  const t = Object.assign({}, have); snap.forEach(d => t[d.id] = toMsDeep(d.data()));
+  try { localStorage.setItem(key, JSON.stringify({ v: 1, n: Object.keys(t).length, t, fin: !!finished })); } catch (_) {}
+  return t;
+}
 async function loadAll(){
-  $('b-reload').disabled = true;
+  $('b-reload').disabled = true; READS = 0;
   try {
     const [ps, ss] = await Promise.all([getDocs(query(collection(db, "participants"), orderBy("created_at", "desc"))), getDocs(collection(db, "sessions"))]);
+    READS += Math.max(1, ps.size) + Math.max(1, ss.size);
     PARTS = ps.docs.map(d => ({ id: d.id, ...d.data() }));
     SESS = ss.docs.map(d => ({ uid: d.id, ...d.data() }));
     $('area').hidden = false; $('rules-help').hidden = true;
-    // 완료된 세션의 회차 기록은 더 바뀌지 않으므로 한 번 읽은 것은 이 브라우저에 보관해 다시 읽지 않음(새로고침마다 수천 건 읽기 → 서버 무료 사용량 절약)
-    const done = new Set(PARTS.map(p => p.uid).filter(Boolean)), todo = SESS.filter(s => {
-      if (!(s.finished && done.has(s.uid))) return true;
-      if (TRIALS[s.uid] && Object.keys(TRIALS[s.uid]).length) return false;
-      try { const c = JSON.parse(localStorage.getItem(TCACHE + s.uid) || "null"); if (c && c.v === 1 && c.n >= 1) { TRIALS[s.uid] = c.t; return false; } } catch (_) {}
-      return true; });
-    for (let i = 0; i < todo.length; i += 25) await Promise.all(todo.slice(i, i + 25).map(async s => {   // 25개씩 나눠 읽기(한꺼번에 수백 건 요청 방지)
-      const q = await getDocs(collection(db, "sessions", s.uid, "trials")); const t = {}; q.forEach(d => t[d.id] = d.data()); TRIALS[s.uid] = t;
-      if (s.finished && done.has(s.uid) && q.size) { try { localStorage.setItem(TCACHE + s.uid, JSON.stringify({ v: 1, n: q.size, t })); } catch (_) {} } }));
-    loadStim(); await loadAlloc(); render(); syncPhones();
+    // 완료된 세션의 회차 기록은 더 바뀌지 않으므로 한 번 읽은 것은 이 브라우저에 보관해 다시 읽지 않고, 진행 중 세션은 마지막 회차부터만 다시 읽음
+    const done = new Set(PARTS.map(p => p.uid).filter(Boolean));
+    const todo = SESS;   // 완료 세션은 trialsOf가 보관본(완료 표시)으로 바로 돌려주고(서버 읽기 0), 진행 중이던 세션만 이어서 읽음
+    for (let i = 0; i < todo.length; i += 25) await Promise.all(todo.slice(i, i + 25).map(async s => { TRIALS[s.uid] = await trialsOf(s.uid, s.finished && done.has(s.uid)); }));
+    loadStim(); await loadAlloc(); render(); await syncPhones();
+    if ($('read-count')) $('read-count').textContent = `이번 불러오기에서 서버 문서 약 ${READS.toLocaleString("ko-KR")}건 읽음`;
   } catch (e) {
     if (e.code === "permission-denied") { $('rules-help').hidden = false; }
     else { $('area').hidden = false; msg('data-msg', "err", `불러오지 못했습니다 (${e.code || e.message}).`); }
@@ -551,8 +578,7 @@ async function syncPhones(){
   const el = $('phone-state'); if (!el) return;
   const loadedAt = Date.now();
   try {
-    const snap = await getDocs(collection(db, "phones"));
-    const have = new Map(snap.docs.map(d => [d.id, d.data()]));
+    const have = new Map(Object.entries(await incCol("phones")));
     // 본 실험(v3 배정표) 완료자만 등록 · 파일럿 완료자는 본 실험에 다시 참여할 수 있게 등록하지 않음(있으면 해제)
     const mainDone = PARTS.filter(p => p.uid && p.alloc === ALLOC_VER);
     const doneUids = new Set(mainDone.map(p => p.uid));
@@ -567,6 +593,7 @@ async function syncPhones(){
     const ops = [...[...add].map(([h, uid]) => ["set", h, uid]), ...drop.map(h => ["del", h])];
     for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(db);
       ops.slice(i, i + 400).forEach(([op, h, uid]) => op === "set" ? b.set(doc(db, "phones", h), { uid, ts: serverTimestamp() }) : b.delete(doc(db, "phones", h))); await b.commit(); }
+    if (drop.length) icDrop("phones", drop);
     const total = have.size - drop.length + add.size - (have.has("probe") ? 1 : 0);
     el.innerHTML = `<b>전화번호 중복 참여 막기</b>: 작동 중 · <b>본 실험을 끝까지 완료한 참가자</b> 번호 ${total}개 등록${add.size ? ` (이번에 ${add.size}명 추가)` : ""}${drop.length ? ` · 미완료자·파일럿 참가자 번호 ${drop.length}개 해제` : ""}. 완료한 번호로 다시 들어오면 참가자 정보 단계에서 "실험 참여가 이미 완료되었습니다"로 막히고, 중간에 그만둔 사람과 파일럿 참가자는 본 실험에 다시 참여할 수 있습니다.`;
   } catch (e) {
@@ -575,8 +602,8 @@ async function syncPhones(){
 }
 async function loadAlloc(){
   try {
-    const [a, lg, vs] = await Promise.all([getDoc(doc(db, "meta", "alloc")), getDocs(collection(db, "alloc_log")), getDocs(collection(db, "visits"))]);
-    ALLOC = a.exists() ? a.data() : null; ALOG = lg.docs.map(d => ({ id: d.id, ...d.data() })); VISITS = {}; vs.forEach(d => VISITS[d.id] = d.data());
+    const [a, lg, vs] = await Promise.all([getDoc(doc(db, "meta", "alloc")), incCol("alloc_log"), incCol("visits")]); READS += 1;
+    ALLOC = a.exists() ? a.data() : null; ALOG = Object.entries(lg).map(([id, x]) => ({ id, ...x })); VISITS = Object.assign({}, vs);
     if (!ALLOC) { $('alloc-state').innerHTML = `<span class="flag">아직 올리지 않았습니다.</span> 배정표가 올라오기 전에는 참가자 앱이 시작되지 않습니다.`; $('seq-info').textContent = ""; return; }
     $('alloc-state').innerHTML = (ALLOC.sha === ALLOC_SHA ? `서버 배정표: 기준 해시와 일치` : `<span class="flag">서버 배정표 확인값이 기준 해시와 다릅니다.</span>`) +
       ` (${esc(ALLOC.file_name || "")}, ${ALLOC.total}행, ${esc(tsKo(ALLOC.uploaded_at))} 올림)`;
@@ -617,6 +644,7 @@ $('b-alloc-testreset').onclick = async () => {
     for (const p of mainP) await deleteDoc(doc(db, "participants", p.id));
     for (const x of ALOG) await deleteDoc(doc(db, "alloc_log", x.id));
     for (const u of uids) if (VISITS[u]) await deleteDoc(doc(db, "visits", u));
+    icClearAll();
     await setDoc(doc(db, "meta", "alloc"), Object.assign({}, ALLOC, { n: 0, slots: {}, who: {} }));
     msg('alloc-msg', "ok", `시험 배정 ${uids.length}건을 되돌렸습니다. 다음 참가자가 seq 1을 받습니다.`); loadAll();
   } catch (e) { msg('alloc-msg', "err", `되돌리지 못했습니다 (${e.code || e.message}).`); }
@@ -959,9 +987,10 @@ $('b-del-vis').onclick = async () => {
   let fail = 0;
   for (const s of ss) { try { for (const t of Object.keys(TRIALS[s.uid] || {})) await deleteDoc(doc(db, "sessions", s.uid, "trials", t)); await deleteDoc(doc(db, "sessions", s.uid)); } catch (e) { fail++; } }
   for (const p of ps) { try { await deleteDoc(doc(db, "participants", p.id)); } catch (e) { fail++; } }
+  icClearAll();
   msg('data-msg', fail ? "err" : "ok", fail ? `일부(${fail}건)를 지우지 못했습니다.` : "삭제했습니다."); loadAll();
 };
-['f-phase','f-cond','f-ver','f-test'].forEach(id => $(id).onchange = render); $('f-q').oninput = render; $('b-reload').onclick = loadAll;
+['f-phase','f-cond','f-ver','f-test'].forEach(id => $(id).onchange = render); $('f-q').oninput = render; $('b-reload').onclick = loadAll; $('b-reload-full').onclick = () => { icClearAll(); loadAll(); };
 </script>
 </body>
 </html>
