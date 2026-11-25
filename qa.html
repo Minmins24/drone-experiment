@@ -63,6 +63,63 @@ async function expectOk(what, fn, check){
   try { const r = await fn(); const extra = check ? check(r) : ""; report(what, "허용", "허용" + (extra === true || extra === "" ? "" : " · " + extra), extra === true || extra === ""); return r; }
   catch (e) { report(what, "허용", e.code || e.message, false); throw e; }
 }
+
+/* ── v8.17 REST 예비 통로 점검: 참가자 앱(index.html)의 REST 코드와 같은 코드로 실서버에 읽기·쓰기·트랜잭션 ── */
+function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("timeout"), { code: "timeout" })), ms))]); }
+  const restVal = v => { if (!v || typeof v !== "object") return null;
+    if ("stringValue" in v) return v.stringValue; if ("integerValue" in v) return Number(v.integerValue); if ("doubleValue" in v) return Number(v.doubleValue);
+    if ("booleanValue" in v) return v.booleanValue; if ("nullValue" in v) return null; if ("timestampValue" in v) { const ms = Date.parse(v.timestampValue); return { __ts: ms, toDate: () => new Date(ms), toMillis: () => ms }; }
+    if ("mapValue" in v) return restFields(v.mapValue.fields || {}); if ("arrayValue" in v) return (v.arrayValue.values || []).map(restVal); return null; };
+  const restFields = f => { const o = {}; for (const k of Object.keys(f)) o[k] = restVal(f[k]); return o; };
+  const DOCS = () => `projects/${firebaseConfig.projectId}/databases/(default)/documents`;
+  const STALL_RE = /timeout|unavailable|deadline|internal|unknown|cancelled|network|fetch|offline/i;
+  const isSTS = v => { try { if (!v || typeof v !== "object" || Array.isArray(v)) return false; const t = serverTimestamp();
+    return typeof v.isEqual === "function" ? v.isEqual(t) : JSON.stringify(v) === JSON.stringify(t); } catch (_) { return false; } };
+  const seg = k => /^[a-zA-Z_][a-zA-Z_0-9]*$/.test(k) ? k : "`" + String(k).replace(/\\/g, "\\\\").replace(/`/g, "\\`") + "`";
+  const isPlain = v => !!v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) && typeof v.toDate !== "function" && !isSTS(v);
+  const encV = v => {
+    if (v === null || v === undefined) return { nullValue: null };
+    if (typeof v === "boolean") return { booleanValue: v };
+    if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: Number.isFinite(v) ? v : String(v) };
+    if (typeof v === "string") return { stringValue: v };
+    if (v instanceof Date) return { timestampValue: v.toISOString() };
+    if (typeof v.toDate === "function") return { timestampValue: v.toDate().toISOString() };
+    if (Array.isArray(v)) return { arrayValue: { values: v.filter(x => x !== undefined).map(encV) } };
+    return { mapValue: { fields: encObj(v, [], []) } };
+  };
+  function encObj(o, path, tf){ const f = {};
+    for (const [k, v] of Object.entries(o)) { if (v === undefined) continue; const pth = path.concat(seg(k));
+      if (isSTS(v)) { tf.push({ fieldPath: pth.join("."), setToServerValue: "REQUEST_TIME" }); continue; }
+      f[k] = isPlain(v) ? { mapValue: { fields: encObj(v, pth, tf) } } : encV(v); }
+    return f; }
+  const wSet = (segs, data) => { const tf = [], w = { update: { name: DOCS() + "/" + segs.join("/"), fields: encObj(data, [], tf) } }; if (tf.length) w.updateTransforms = tf; return w; };
+  const wUpdate = (segs, data) => { const tf = [], mask = [], fields = {};
+    for (const [k, v] of Object.entries(data)) { if (v === undefined) continue; const parts = k.split("."), pth = parts.map(seg);
+      if (isSTS(v)) { tf.push({ fieldPath: pth.join("."), setToServerValue: "REQUEST_TIME" }); continue; }
+      mask.push(pth.join("."));
+      let o = fields; for (const part of parts.slice(0, -1)) { o[part] = o[part] || { mapValue: { fields: {} } }; o = o[part].mapValue.fields; }
+      o[parts[parts.length - 1]] = isPlain(v) ? { mapValue: { fields: encObj(v, pth, tf) } } : encV(v); }
+    const w = { update: { name: DOCS() + "/" + segs.join("/"), fields }, updateMask: { fieldPaths: mask }, currentDocument: { exists: true } };
+    if (tf.length) w.updateTransforms = tf; return w; };
+  async function rest(method, path, body){
+    const tok = await withTimeout(auth.currentUser.getIdToken(), 15000);
+    const r = await withTimeout(fetch("https://firestore.googleapis.com/v1/" + path, { method, cache: "no-store",
+      headers: Object.assign({ Authorization: "Bearer " + tok }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined }), 20000);
+    if (r.ok) { const t = await r.text(); return t ? JSON.parse(t) : {}; }
+    let st = ""; try { const j = await r.json(); st = ((j && j.error && (j.error.status + " " + (j.error.message || ""))) || ""); } catch (_) {}
+    const code = r.status === 403 || /PERMISSION_DENIED/.test(st) ? "permission-denied"
+      : r.status === 404 || /NOT_FOUND|No document to update/.test(st) ? "not-found"
+      : /ALREADY_EXISTS/.test(st) ? "already-exists" : r.status === 409 || /ABORTED/.test(st) ? "aborted"
+      : r.status === 429 || /RESOURCE_EXHAUSTED/.test(st) ? "resource-exhausted" : /FAILED_PRECONDITION/.test(st) ? "failed-precondition"
+      : r.status === 401 ? "unauthenticated" : r.status >= 500 ? "unavailable" : "rest_" + r.status;
+    throw Object.assign(new Error(code + " " + st.slice(0, 80)), { code });
+  }
+  async function restGet(segs, transaction){
+    try { const j = await rest("GET", DOCS() + "/" + segs.map(encodeURIComponent).join("/") + (transaction ? "?transaction=" + encodeURIComponent(transaction) : ""));
+      return restFields(j.fields || {}); }
+    catch (e) { if (e && e.code === "not-found") return null; throw e; }
+  }
+  const restCommit = (writes, transaction) => rest("POST", DOCS() + ":commit", transaction ? { writes, transaction } : { writes });
 $('b-run').onclick = async () => {
   $('b-run').disabled = true; $('tb').innerHTML = ""; rows = []; k = 0; $('sum').textContent = "점검 중…";
   try {
@@ -108,7 +165,16 @@ $('b-run').onclick = async () => {
       await b.commit(); return s; });
     await expectDeny("배정 기록 다시 쓰기", () => setDoc(doc(db, "alloc_log", `${k}_0`), { type: "assign", seq: k, r: 0, uid, prev_uid: "x", reason: "", app_version: "qa", ts: serverTimestamp() }));
     await expectDeny("다른 이름으로 결과 문서 만들기(세션당 1개 규칙)", () => setDoc(doc(db, "participants", "x_" + uid), { pid: "0000", phone: "", uid, slot: k, seq: k, alloc: "v3", condition: row.condition, template: row.template, app_version: "qa", summary: {}, summary_cols: [], trials_cols: [], trials_csv: "", events_cols: [], events_csv: "", created_at: serverTimestamp() }));
-    await expectOk("첫 방문 시각 기록", () => setDoc(doc(db, "visits", uid), { app_version: "qa", ts: serverTimestamp() }));
+    // [v8.17] 라이브러리 연결이 멈춘 기기(갤럭시 일부 통신망 등)용 REST 예비 통로 — 실서버가 앱의 REST 요청 형식을 그대로 받아들이는지 확인
+    await expectOk("[v8.17] REST 읽기(동결 자료 확인값)", () => restGet(["meta", "stimulus"]), d => d && d.sha256 === FROZEN_SHA ? true : "값 다름");
+    await expectOk("[v8.17] REST 읽기(자기 세션·서버 시각)", () => restGet(["sessions", uid]), d => d && d.seq === k && d.created_at && typeof d.created_at.toMillis === "function" && Math.abs(d.created_at.toMillis() - Date.now()) < 36e5 ? true : "형식 이상");
+    await expectDeny("[v8.17] REST 읽기 거부 확인(다음 seq 행)", () => restGet(["alloc", String(k + 1)]));
+    await expectOk("[v8.17] REST 트랜잭션 시작·읽기·취소", async () => { const { transaction } = await rest("POST", DOCS() + ":beginTransaction", { options: { readWrite: {} } });
+      const a = await restGet(["meta", "alloc"], transaction); await rest("POST", DOCS() + ":rollback", { transaction }); return a; }, a => a && a.who && a.who[uid] === k ? true : "배정 상태 이상");
+    await expectDeny("[v8.17] REST로 seq 하나 더 받기(형식 정상·규칙 거부)", async () => { const { transaction } = await rest("POST", DOCS() + ":beginTransaction", { options: { readWrite: {} } });
+      await restGet(["meta", "alloc"], transaction);
+      return restCommit([wUpdate(["meta", "alloc"], { n: k + 1, [`slots.${k + 1}`]: { t: serverTimestamp(), d: false, r: 0, u: uid }, [`who.${uid}`]: k + 1 })], transaction); });
+    await expectOk("첫 방문 시각 기록 ([v8.17] REST 쓰기 + 서버 시각)", () => restCommit([wSet(["visits", uid], { app_version: "qa", ts: serverTimestamp() })]));
     await expectDeny("첫 방문 시각 다시 쓰기", () => setDoc(doc(db, "visits", uid), { app_version: "qa", ts: serverTimestamp() }));
     // v8.12 규칙: 같은 전화번호 중복 참여 막기(phones) — 끝까지 완료한 사람만 번호 등록, 참여 시작 시에는 등록 여부만 읽기
     { const hx = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("qa-check:" + uid)))].map(x => x.toString(16).padStart(2, "0")).join("");
@@ -144,6 +210,12 @@ $('b-run').onclick = async () => {
     await expectDeny("T 다시 바꾸기", () => updateDoc(tr("t01"), { T: 90 }));
     await expectOk("2회차 단서 읽기(1회차 T 후)", async () => (await getDoc(doc(db, "cues", T, "t", "t02"))).data());
     await expectDeny("3회차 단서 미리 읽기", () => getDoc(doc(db, "cues", T, "t", "t03")));
+    { const c2 = await restGet(["cues", T, "t", "t02"]);
+      await expectOk("[v8.17] REST로 2회차 H 저장(정수·문서 생성)", () => restCommit([wSet(["sessions", uid, "trials", "t02"], { trial: 2, template: T, item_id: c2.item_id, H: 1, rt_H: 1000, rt_H_first: 900, ts_cue: "qa", ts_H: "qa", net_cue_ms: 10, resumed: 0 })]));
+      await expectOk("[v8.17] REST로 2회차 A 저장(부분 수정)", () => restCommit([wUpdate(["sessions", uid, "trials", "t02"], { A: 0, rt_A: 800, rt_A_first: 700, ts_A: "qa" })]));
+      await expectOk("[v8.17] REST 목록 읽기(자기 시행)", async () => { const j = await rest("GET", DOCS() + "/sessions/" + uid + "/trials"); return (j.documents || []).map(x => restFields(x.fields || {})); },
+        l => l.length === 2 && l.some(x => x.trial === 1 && x.T === 55) && l.some(x => x.trial === 2 && x.H === 1 && x.A === 0) ? true : "목록 이상"); }
+      await expectDeny("[v8.17] REST로 2회차 H 바꾸기", () => restCommit([wUpdate(["sessions", uid, "trials", "t02"], { H: 0 })]));
     await expectDeny("20회차 전 완료 표시", () => updateDoc(sref, { finished: true, ts_finished: "qa" }));
     await expectDeny("다른 사람 이름(uid)으로 결과 문서 만들기", () => setDoc(doc(db, "participants", "qa_forged_" + uid.slice(0, 6)), { pid: "0000", phone: "", uid: "someone-else", slot: 0, condition: "control", template: T, app_version: "qa", summary: {}, summary_cols: [], trials_cols: [], trials_csv: "", events_cols: [], events_csv: "", created_at: serverTimestamp() }));
     await expectDeny("결과 문서 목록 읽기(참가자)", () => getDoc(doc(db, "participants", "anything")));
