@@ -982,7 +982,10 @@ $('b-dl-alog').onclick = () => { const [cols, rows] = allocLogCsv(); if (!rows.l
 $('b-del-vis').onclick = async () => {
   const ss = visibleSess(), ps = visibleParts();
   if (!ss.length && !ps.length) return msg('data-msg', "info", "지울 기록이 없습니다.");
-  const typed = prompt(`보이는 세션 ${ss.length}개(회차 기록 포함)와 결과 문서 ${ps.length}개를 영구 삭제합니다. 되돌릴 수 없습니다.\n먼저 CSV를 받아 두었는지 확인하세요.\n\n계속하려면 "삭제"라고 입력하세요.`);
+  // v8.17.4: 본실험 seq를 가진 세션을 지우면 그 seq는 무효 처리하지 않는 한 다시 배정되지 않음(완료된 seq는 영영 빈칸) → 먼저 알림
+  const keep = ss.filter(s => isMain(s) && s.seq != null && ALLOC && (ALLOC.slots || {})[String(s.seq)] && ALLOC.slots[String(s.seq)].u === s.uid && !voidOf(s.uid)).map(s => s.seq);
+  const warn = keep.length ? `\n\n주의: seq ${keep.slice(0, 15).join(", ")}${keep.length > 15 ? " 외" : ""}(${keep.length}개)는 아직 무효 처리하지 않았습니다. 지우기만 하면 이 seq는 다른 참가자에게 다시 배정되지 않습니다(완료된 seq는 빈칸으로 남음). 시험·중복 기록이라면 먼저 위의 '무효 처리 후 다시 배정'을 하세요.` : "";
+  const typed = prompt(`보이는 세션 ${ss.length}개(회차 기록 포함)와 결과 문서 ${ps.length}개를 영구 삭제합니다. 되돌릴 수 없습니다.\n먼저 CSV를 받아 두었는지 확인하세요.${warn}\n\n계속하려면 "삭제"라고 입력하세요.`);
   if (typed === null) return; if (typed.trim() !== "삭제") return msg('data-msg', "info", "입력이 \"삭제\"와 달라 아무것도 지우지 않았습니다.");
   let fail = 0;
   for (const s of ss) { try { for (const t of Object.keys(TRIALS[s.uid] || {})) await deleteDoc(doc(db, "sessions", s.uid, "trials", t)); await deleteDoc(doc(db, "sessions", s.uid)); } catch (e) { fail++; } }

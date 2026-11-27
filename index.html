@@ -585,7 +585,7 @@ const THREE_READY = (async () => {
      동결 CSV를 한 번 올리면 서버(Firestore)에 저장되고, 보안 규칙이 단계별로만 내려줍니다.
    ===================================================================== */
 const CONFIG = {
-  appVersion: "v8.17.3",
+  appVersion: "v8.17.4",
   officialUrl: "https://minmins24.github.io/drone-experiment/",   // 참가자에게 보내는 실험 주소(파일로 열었을 때 이 주소로 안내)
   previewMode: false,   // true면 Claude 미리보기용(서버 대신 브라우저 안의 시험용 자료 사용, 저장 안 함)
   firebase: {
@@ -726,6 +726,32 @@ function buildPre(){
   INFO_KEYS.forEach(k => o[k] = S.info[k] ?? "");
   ["age", "ai_use_freq", "ai_knowledge_10"].forEach(k => o[k] = Number(o[k]));
   return o;
+}
+/* v8.17.4: 보안 규칙의 세션 생성 조건(preOk·pid·전화번호 일치)과 같은 확인 — 맞지 않는 항목 이름 목록(빈 배열이면 통과) */
+const INFO_OPTS = { age_group: ["10s","20s","30s","40s","50s","60s"], gender: ["male","female"], edu: ["middle_or_less","high","college","grad"], exp_drone: ["never","media","onsite","piloted"] };
+function infoProblems(p){
+  const bad = [], int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+  if (!/^[0-9]{4}$/.test(String(S.pid || ""))) bad.push("pid");
+  if (!/^01\d{8,9}$/.test(String(S.info.phone || "").replace(/\D/g, ""))) bad.push("phone");
+  if (!int(p.age, 19, 99)) bad.push("age");
+  for (const k of Object.keys(INFO_OPTS)) if (!INFO_OPTS[k].includes(p[k])) bad.push(k);
+  if (int(p.age, 19, 99) && INFO_OPTS.age_group.includes(p.age_group) && p.age_group !== (p.age >= 60 ? "60s" : Math.floor(p.age / 10) * 10 + "s")) bad.push("age_group");
+  if (!int(p.ai_use_freq, 1, 7)) bad.push("ai_use_freq");
+  if (!int(p.ai_knowledge_10, 1, 10)) bad.push("ai_knowledge_10");
+  return [...new Set(bad)];
+}
+/* 참가자 정보 다시 확인: 남아 있는 값은 채워 두고, 맞지 않는 값만 비움 → '다음'을 누르면 본 과제 시작 전 화면으로 돌아감 */
+function openInfoFix(){
+  S.fixInfo = true;
+  const p = buildPre(), bad = infoProblems(p);
+  $('i-pid').value = /^[0-9]{4}$/.test(String(S.pid || "")) ? S.pid : "";
+  $('i-phone').value = bad.includes("phone") ? "" : String(S.info.phone || "");
+  $('i-age').value = bad.includes("age") ? "" : String(p.age);
+  document.querySelectorAll('#s-info .opts').forEach(g => { const k = g.dataset.name;
+    if (bad.includes(k) || !g.querySelector(`.opt[data-v="${S.info[k]}"]`)) delete S.info[k];
+    g.querySelectorAll('.opt').forEach(x => { const on = x.dataset.v === String(S.info[k] ?? ""); x.classList.toggle('sel', on); x.setAttribute('aria-pressed', String(on)); }); });
+  $('info-err').textContent = "참가자 정보 중 일부가 비어 있거나 맞지 않습니다. 비어 있는 항목을 다시 선택한 뒤 '다음'을 눌러 주세요. 다른 응답은 그대로 남아 있습니다.";
+  setPhase("info"); show('s-info'); window.scrollTo(0, 0);
 }
 const POST_SURVEY = [
   { block: "TP", type: "slider100", suffix: "", leftLabel: TRUST_LEFT, rightLabel: TRUST_RIGHT, items: [
@@ -1025,6 +1051,19 @@ function makeFirebaseBackend(){
       try { await commitOps("assign", ops); }
       catch (e) {   // 앞선 시도(라이브러리)가 늦게 저장된 경우: 세션이 이미 있으면 그것으로 진행
         if (e && /permission-denied|already-exists/.test(e.code)) { const s2 = await getOne("sessions", api.uid); if (s2) return s2; }
+        if (e && e.code === "permission-denied") {
+          // v8.17.4: 세션이 없는데 서버가 거부한 경우(같은 거부가 계속 반복되어 진행이 막히지 않게)
+          //  ① 이 계정이 예전에 받은 seq를 다시 쓰려는 경우: 그 seq의 세션이 지워졌거나(연구자 삭제) 무효 처리·재발급되어 배정 기록(alloc_log)이 이미 있음
+          //     → 이 계정의 배정 기록은 더 쓸 수 없으므로, 새 익명 계정으로 새 seq를 받음(assignWithT0에서 처리)
+          if (p.existing) throw Object.assign(new Error("stale_uid"), { code: "stale_uid", seq: p.k });
+          //  ② 새 seq인데 같은 이름의 배정 기록(seq_r)이 이미 남아 있는 경우(예전 배정 상태의 기록 등): 기록은 건너뛰고 세션만 저장
+          if (ops.length > 1) {
+            log("error", { note: `assign_log_exists_skip:${p.k}_${p.r}` });
+            try { await commitOps("assign", [ops[0]]); }
+            catch (e2) { if (e2 && /permission-denied|already-exists/.test(e2.code)) { const s3 = await getOne("sessions", api.uid); if (s3) return s3; } throw e2; }
+            return Object.assign({}, sess, { created_at: null });
+          }
+        }
         throw e;
       }
       return Object.assign({}, sess, { created_at: null });
@@ -1853,6 +1892,8 @@ $('b-info').onclick = async () => {
   S.pid = pid; S.info.phone = phone.replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3"); S.info.age = age;
   S.events.forEach(ev => ev.pid = pid);
   for (const k of ["age","age_group","gender","edu","exp_drone","ai_use_freq","ai_knowledge_10"]) log("survey", { item_id: k, value: S.info[k] });
+  persistLocal();
+  if (S.fixInfo) { S.fixInfo = false; log("page", { note: "info_fixed" }); showProcedure(); return; }   // v8.17.4: 정보만 다시 확인한 경우 → 본 과제 시작 전 화면으로
   setPhase("ai_intro"); show('s-ai-intro');   // v8.6.0: 참가자 정보 다음, 사전 설문 앞에 AI·자동화 시스템 소개
 };
 function startPreSurvey(idx = 0){
@@ -2051,9 +2092,26 @@ async function assignWithT0(rec){
     log("error", { note: "pre_incomplete_before_assign:" + preStatus(S.survey) });
     block("지금은 실험을 계속할 수 없습니다", `앞에서 응답한 설문 기록을 찾지 못했습니다. 이 창을 닫고 처음부터 다시 시작해 주세요. (문의: ${CONFIG.consent.contact})`); return false;
   }
+  // v8.17.4: 서버 규칙(세션 생성 조건)과 같은 기준으로 참가자 정보를 미리 확인 → 맞지 않으면 서버에 보내지 않고 정보 화면에서 다시 입력(거부 반복 방지)
+  { const bad = infoProblems(buildPre()); if (bad.length) { log("error", { note: "info_invalid_before_assign:" + bad.join("|") }); openInfoFix(); return false; } }
   const base = Object.assign({ pid: S.pid, phone: S.info.phone || "", app_version: CONFIG.appVersion, stim_sha: CONFIG.stimulusSha256, comp_passed: S.comp.passed ? 1 : 0,
     comp_attempts: S.comp.attempts, comp_reviewed: S.comp.reviewed ? 1 : 0, view: USE_GL() ? "3d" : "2d", pre: buildPre() }, rec);
-  try { S.session = await net("assign", () => BE.assign(base), { timeout: 25000, fatal: c => c === "closed" || c === "alloc_missing" || c === "alloc_row_missing" }); }
+  // 이 계정의 예전 배정 기록이 낡아 서버가 거부하면(stale_uid) 새 익명 계정으로 한 번(최대 두 번) 새로 배정
+  const doAssign = async () => {
+    try { return await BE.assign(base); }
+    catch (e) {
+      if (!(e && e.code === "stale_uid")) throw e;
+      if ((S.uidRenewN || 0) >= 2) throw Object.assign(new Error("permission-denied"), { code: "permission-denied" });
+      S.uidRenewN = (S.uidRenewN || 0) + 1;
+      const old = String(S.uid || "");
+      S.uid = await BE.newIdentity(); S.allocPrev = null;
+      log("page", { note: `stale_seq_${e.seq}_new_uid:${old.slice(0, 6)}` });
+      claimTab(); persistLocal();
+      try { await withTimeout(BE.markVisit(), 15000); } catch (_) {}
+      return await BE.assign(base);
+    }
+  };
+  try { S.session = await net("assign", doAssign, { timeout: 45000, fatal: c => c === "closed" || c === "alloc_missing" || c === "alloc_row_missing" }); }
   catch (e) {
     const c = e && e.code;
     if (c === "closed") { showClosed(); return false; }
@@ -2151,8 +2209,10 @@ async function runTrial(n, resumed = false){
     const now = performance.now();
     const rec = { trial: n, template: sess.template, item_id: cue.item_id, H: g.value(), rt_H: Math.round(now - shownT),
       rt_H_first: Math.round(g.firstT() - shownT), ts_cue: tsCue, ts_H: isoLocal(), net_cue_ms: netCue, resumed: resumed ? 1 : 0 };
-    await net("H", () => BE.createTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && x.H === rec.H) return true; } });
-    doc = S.trials[t] = Object.assign({}, rec);
+    // 이미 서버에 이 회차의 선택이 있으면(다른 탭·늦게 도착한 저장 등) 서버 값을 따름 — 같은 거부가 반복되어 멈추지 않게(v8.17.4)
+    let srvH = null;
+    await net("H", () => BE.createTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && "H" in x) { if (x.H !== rec.H) { srvH = x; log("error", { trial: n, note: "H_server_differs" }); } return true; } } });
+    doc = S.trials[t] = srvH ? Object.assign({}, srvH) : Object.assign({}, rec);
     log("trial", { trial: n, item_id: cue.item_id, step: "H", value: rec.H, rt_ms: rec.rt_H });
   }
   $('st-h').hidden = true; $('st-h-locked').hidden = false; $('st-h-locked').textContent = `1단계 · 본인 선택: ${sideName(doc.H)}`;
@@ -2167,8 +2227,9 @@ async function runTrial(n, resumed = false){
     await new Promise(res => $('b-a').onclick = () => { if (g.value() !== null) res(); });
     g.lock(); $('b-a').disabled = true;
     const rec = { A: g.value(), rt_A: Math.round(performance.now() - aShown), rt_A_first: Math.round(g.firstT() - aShown), ts_A: isoLocal() };
-    await net("A", () => BE.updateTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && x.A === rec.A) return true; } });
-    Object.assign(doc, rec);
+    let srvA = null;
+    await net("A", () => BE.updateTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && "A" in x) { if (x.A !== rec.A) { srvA = x; log("error", { trial: n, note: "A_server_differs" }); } return true; } } });
+    Object.assign(doc, srvA || rec);
     log("trial", { trial: n, item_id: cue.item_id, step: "A", value: rec.A, rt_ms: rec.rt_A });
   }
   $('st-a').hidden = true; $('st-a-locked').hidden = false;
@@ -2208,8 +2269,9 @@ async function runTrial(n, resumed = false){
   $('b-t').disabled = true;
   const rec = { D, C, time_C: timeC, cum, T: sl.value(), rt_T: Math.round(performance.now() - rShown), ts_result: tsRes, ts_T: isoLocal(), net_out_ms: netOut };
   if (resumed) rec.resumed = 1;   // 이 회차 도중 새로고침·재접속이 있었음 (H 저장 후 끊긴 경우 포함)
-  await net("T", () => BE.updateTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && x.T === rec.T) return true; } });
-  Object.assign(doc, rec);
+  let srvT = null;
+  await net("T", () => BE.updateTrial(t, rec), { recover: async () => { const x = await BE.getTrial(t); if (x && "T" in x) { if (x.T !== rec.T) { srvT = x; log("error", { trial: n, note: "T_server_differs" }); } return true; } } });
+  Object.assign(doc, srvT || rec);
   log("trust", { trial: n, item_id: cue.item_id, step: "T", value: rec.T, rt_ms: rec.rt_T });
   await sceneLeave();
 }
