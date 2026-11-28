@@ -152,13 +152,14 @@ td.na{color:#b0b6b1}
         <button class="btn primary" id="b-dl-total" title="참가자 정보·배정·모든 척도·연습·과제 요약·사후 설문·진행 기록 요약·20회차 자료를 한 파일에">전체(total) CSV</button>
         <button class="btn" id="b-dl-codebook" title="전체(total) CSV의 열 이름과 뜻">열 설명(코드북) CSV</button>
         <button class="btn" id="b-dl-trials">회차 자료(trials_long) CSV</button>
+        <button class="btn" id="b-dl-check" title="참가자마다 회차 기록이 바로 그 세션의 것인지, 20회가 다 있는지, 요약값과 맞는지 확인한 결과">점검 보고서 CSV</button>
         <button class="btn" id="b-dl-sess">세션 목록 CSV</button>
         <button class="btn" id="b-dl-sum">summary CSV</button>
         <button class="btn" id="b-dl-ev">events CSV</button>
         <button class="btn" id="b-dl-alog" title="본실험 배정·재발급 기록 전체(필터와 무관)">배정·재발급 기록 CSV</button>
         <button class="btn danger" id="b-del-vis">보이는 기록 모두 삭제</button>
       </div>
-      <p class="sub" style="margin-top:8px"><b>전체(total) CSV</b>는 참가자 1명 × 20회차를 한 줄씩(1명 = 20줄) 담고, 각 줄에 그 참가자의 모든 정보(참가자 정보·배정·기기, 사전 척도 문항별 점수와 평균, 이해 확인, 연습 선택, 과제 요약, 사후 설문, 진행 기록 요약)를 함께 붙입니다. 회차 기록이 없는 참가자도 1줄로 들어갑니다. 지금 표에 보이는 참가자만 담기므로, 전체를 받으려면 필터를 ‘전체’로 두세요. <b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.</p>
+      <p class="sub" style="margin-top:8px"><b>전체(total) CSV</b>는 참가자 1명 × 20회차를 한 줄씩(1명 = 20줄) 담고, 각 줄에 그 참가자의 모든 정보(참가자 정보·배정·기기, 사전 척도 문항별 점수와 평균, 이해 확인, 연습 선택, 과제 요약, 사후 설문, 진행 기록 요약)를 함께 붙입니다. 회차 기록이 없는 참가자도 1줄로 들어갑니다. 지금 표에 보이는 참가자만 담기므로, 전체를 받으려면 필터를 ‘전체’로 두세요. <b>회차 자료</b>는 서버가 단계별로 검증해 저장한 기록(세션·회차)에서 만들며, 연구자용 F·기대시간·기준모형 손실을 붙입니다. 중도 이탈 세션도 포함됩니다(trials_done으로 구분). summary·events는 끝까지 마친 참가자가 보낸 요약입니다. 노란 행은 같은 전화번호가 두 번 이상인 경우입니다.<br><b>v8.18 검증</b>: CSV를 만들 때마다 이 브라우저의 보관본을 쓰지 않고 서버에서 회차 기록을 새로 읽은 뒤, 각 회차가 바로 그 세션의 것인지(번호·템플릿·문항·세션 시간 범위) 확인하고 통과한 회차만 넣습니다. 참가자마다 <b>check_status</b>(ok / 점검 필요)와 <b>analysis_ok</b>(분석 포함 가능 1/0)를 붙이고, 사유는 <b>점검 보고서 CSV</b>에 있습니다(완료자 20회, 요약값 T_mean·A_rate와 일치, integrity 모두 ok, 같은 seq의 다른 완료 세션 없음 등).</p>
       <div class="msg" id="data-msg" hidden></div>
       <div class="tbl-wrap"><table>
         <thead>
@@ -208,6 +209,7 @@ const tid = n => "t" + String(n).padStart(2, "0");
 function esc(v){ return String(v ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch])); }
 function msg(id, kind, text){ const m = $(id); m.className = "msg " + kind; m.textContent = text; m.hidden = !text; }
 let PARTS = [], SESS = [], TRIALS = {}, STIM = null;
+const CHECK = new Map();   // v8.18: 세션별 내보내기 검증 결과(uid → 결과). 회차 기록을 새로 읽거나 다시 불러오면 비움
 
 $('b-login').onclick = async () => {
   $('login-err').hidden = true;
@@ -381,7 +383,7 @@ const toMsDeep = v => { if (v && typeof v === "object") { if (typeof v.toMillis 
 function icGet(name){ try { const c = JSON.parse(localStorage.getItem(ICACHE + name) || "null"); if (c && c.v === 1 && c.docs) return c; } catch (_) {} return { v: 1, max: 0, docs: {} }; }
 function icPut(name, c){ try { localStorage.setItem(ICACHE + name, JSON.stringify(c)); } catch (_) {} }
 function icDrop(name, ids){ const c = icGet(name); (ids || []).forEach(id => delete c.docs[id]); icPut(name, c); }
-function icClearAll(){ try { Object.keys(localStorage).filter(k => k.startsWith(ICACHE) || k.startsWith(TCACHE)).forEach(k => localStorage.removeItem(k)); } catch (_) {} for (const k of Object.keys(TRIALS)) delete TRIALS[k]; }
+function icClearAll(){ try { Object.keys(localStorage).filter(k => k.startsWith(ICACHE) || k.startsWith(TCACHE)).forEach(k => localStorage.removeItem(k)); } catch (_) {} for (const k of Object.keys(TRIALS)) delete TRIALS[k]; CHECK.clear(); SEQG = null; }
 async function incCol(name){
   const c = icGet(name), MARGIN = 10 * 60000;
   const q = c.max ? query(collection(db, name), where("ts", ">=", Timestamp.fromMillis(c.max - MARGIN))) : collection(db, name);
@@ -389,15 +391,36 @@ async function incCol(name){
   snap.forEach(d => { const x = toMsDeep(d.data()); c.docs[d.id] = x; const m = tsMs(x.ts); if (Number.isFinite(m) && m > c.max) c.max = m; });
   icPut(name, c); return c.docs;
 }
-async function trialsOf(uid, finished){
-  const key = TCACHE + uid; let c = null; try { c = JSON.parse(localStorage.getItem(key) || "null"); } catch (_) {}
-  if (c && c.v === 1 && c.n >= 1 && finished && c.fin) return c.t;
-  const have = c && c.v === 1 && c.t ? c.t : {}, maxT = Math.max(0, ...Object.values(have).map(x => Number(x.trial) || 0));
+/* v8.18: 보관본은 '어느 세션의 기록인지'(세션 배정 시각·seq·템플릿)를 함께 적어 두고, 세션이 다르면(지웠다 다시 생긴 세션 등) 버리고 새로 읽음.
+   예전(v1) 보관본은 세션 표시가 없어 모두 버림(한 번만 전체를 다시 읽음). */
+const sessKey = s => [tsMs(s.created_at), s.seq ?? "", s.slot ?? "", s.template ?? "", s.condition ?? ""].join("|");
+async function trialsOf(s, finished){
+  const uid = s.uid, key = TCACHE + uid, sk = sessKey(s); let c = null; try { c = JSON.parse(localStorage.getItem(key) || "null"); } catch (_) {}
+  if (!(c && c.v === 2 && c.sk === sk && c.t)) c = null;
+  if (c && c.n >= 1 && finished && c.fin) return c.t;
+  const have = c ? c.t : {}, maxT = Math.max(0, ...Object.values(have).map(x => Number(x.trial) || 0));
   const q = maxT ? query(collection(db, "sessions", uid, "trials"), where("trial", ">=", maxT)) : collection(db, "sessions", uid, "trials");
   const snap = await getDocs(q); READS += Math.max(1, snap.size);
   const t = Object.assign({}, have); snap.forEach(d => t[d.id] = toMsDeep(d.data()));
-  try { localStorage.setItem(key, JSON.stringify({ v: 1, n: Object.keys(t).length, t, fin: !!finished })); } catch (_) {}
+  try { localStorage.setItem(key, JSON.stringify({ v: 2, sk, n: Object.keys(t).length, t, fin: !!finished })); } catch (_) {}
   return t;
+}
+/* v8.18: 내보내기 직전에는 보관본을 쓰지 않고, 내보낼 세션의 회차 기록을 서버에서 모두 새로 읽음(서버 = 유일한 기준) */
+const stableJson = v => JSON.stringify(v, (k, x) => x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, kk) => (o[kk] = x[kk], o), {}) : x);
+async function freshTrials(ss, onProg){
+  let reads = 0; const changed = [];
+  for (let i = 0; i < ss.length; i += 20) {
+    await Promise.all(ss.slice(i, i + 20).map(async s => {
+      const snap = await getDocs(collection(db, "sessions", s.uid, "trials")); reads += Math.max(1, snap.size);
+      const t = {}; snap.forEach(d => t[d.id] = toMsDeep(d.data()));
+      if (stableJson(TRIALS[s.uid] || {}) !== stableJson(t)) changed.push(s);
+      TRIALS[s.uid] = t;
+      try { localStorage.setItem(TCACHE + s.uid, JSON.stringify({ v: 2, sk: sessKey(s), n: Object.keys(t).length, t, fin: !!(s.finished && partOf(s)) })); } catch (_) {}
+    }));
+    if (onProg) onProg(Math.min(i + 20, ss.length), ss.length);
+  }
+  READS += reads; CHECK.clear();
+  return { reads, changed };
 }
 async function loadAll(){
   $('b-reload').disabled = true; READS = 0;
@@ -410,7 +433,8 @@ async function loadAll(){
     // 완료된 세션의 회차 기록은 더 바뀌지 않으므로 한 번 읽은 것은 이 브라우저에 보관해 다시 읽지 않고, 진행 중 세션은 마지막 회차부터만 다시 읽음
     const done = new Set(PARTS.map(p => p.uid).filter(Boolean));
     const todo = SESS;   // 완료 세션은 trialsOf가 보관본(완료 표시)으로 바로 돌려주고(서버 읽기 0), 진행 중이던 세션만 이어서 읽음
-    for (let i = 0; i < todo.length; i += 25) await Promise.all(todo.slice(i, i + 25).map(async s => { TRIALS[s.uid] = await trialsOf(s.uid, s.finished && done.has(s.uid)); }));
+    for (let i = 0; i < todo.length; i += 25) await Promise.all(todo.slice(i, i + 25).map(async s => { TRIALS[s.uid] = await trialsOf(s, s.finished && done.has(s.uid)); }));
+    CHECK.clear();
     loadStim(); await loadAlloc(); render(); await syncPhones();
     if ($('read-count')) $('read-count').textContent = `이번 불러오기에서 서버 문서 약 ${READS.toLocaleString("ko-KR")}건 읽음`;
   } catch (e) {
@@ -710,15 +734,16 @@ function render(){
     [st.filter(x => x.status === "중도 이탈").length, "중도 이탈"], [Object.values(phones).filter(x => x > 1).length, "중복 의심 전화번호"]
   ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
   $('tbody').innerHTML = visibleSess().map(s => {
-    const p = partOf(s) || {}, sm = p.summary || {}, { n, status } = sessStatus(s), tr = Object.values(TRIALS[s.uid] || {}).filter(x => "T" in x);
+    const p = partOf(s) || {}, sm = p.summary || {}, ck = STIM ? checkSession(s) : null, { status } = sessStatus(s), n = ck ? ck.nValid : sessStatus(s).n;
+    const tr = Object.values(ck ? ck.acc : (TRIALS[s.uid] || {})).filter(x => "T" in x);
     const aRate = tr.length ? (tr.reduce((a, x) => a + x.A, 0) / tr.length).toFixed(2) : "", tMean = tr.length ? (tr.reduce((a, x) => a + x.T, 0) / tr.length).toFixed(1) : "";
-    const cum = tr.length ? Math.max(...tr.map(x => x.cum)) : "", last = (TRIALS[s.uid] || {})[tid(20)] || {};
+    const cum = tr.length ? Math.max(...tr.map(x => x.cum)) : "", last = (ck ? ck.acc[20] : (TRIALS[s.uid] || {})[tid(20)]) || {};
     const hc = sm.H_correct_n ?? "", cc = sm.C_correct_n ?? "";
     const td = (v, cls = "num") => `<td class="${cls}${v === "" || v === undefined || v === null ? " na" : ""}">${v === "" || v === undefined || v === null ? "–" : esc(v)}</td>`;
     const comp = s.comp_passed === undefined ? "" : (Number(s.comp_passed) === 1 ? "통과" : "해설 후 진행");
     return `<tr class="${p.phone && phones[p.phone] > 1 ? "dup" : ""}"><td>${esc(s.created_at && s.created_at.toDate ? s.created_at.toDate().toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }) : "")}</td>
       <td>${esc(s.pid)}</td><td>${esc(p.phone || "")}</td><td class="num">${isMain(s) ? esc(s.seq) : `<span class="sub">P${esc(s.slot)}</span>`}</td><td><span class="pill ${esc(s.condition)}">${esc(CNAME[s.condition] || s.condition)}</span></td>
-      <td>${esc(s.template)}</td><td class="num">${n}/20</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}${sm.research_data_complete !== undefined && Number(sm.research_data_complete) === 0 ? ` <span class="flag" title="사전·사후 필수 자료 중 빠진 것이 있음(pre_data_status·post_data_status 확인)">자료 누락</span>` : ""}</td><td>${esc(s.app_version)}</td>
+      <td>${esc(s.template)}</td><td class="num">${n}/20${STIM && checkSession(s).status !== "ok" ? ` <span class="flag" title="${esc(checkSession(s).err.join(" | "))}">점검 필요</span>` : ""}</td><td>${status === "중도 이탈" ? `<span class="flag">${status}</span>` : status}${sm.research_data_complete !== undefined && Number(sm.research_data_complete) === 0 ? ` <span class="flag" title="사전·사후 필수 자료 중 빠진 것이 있음(pre_data_status·post_data_status 확인)">자료 누락</span>` : ""}</td><td>${esc(s.app_version)}</td>
       ${td(sm.age, "num gs")}${td(LBL.age_group[sm.age_group] ?? sm.age_group, "")}${td(LBL.gender[sm.gender] ?? sm.gender, "")}${td(LBL.edu[sm.edu] ?? sm.edu, "")}${td(LBL.exp_drone[sm.exp_drone] ?? sm.exp_drone, "")}${td([s.device, s.os_name, s.view].filter(Boolean).join(" · "), "")}
       ${td(sm.ptt_mean, "num gs")}${td(sm.ai_mean)}${td(sm.mails_mean)}${td(sm.ait_mean)}${td(sm.tia_pre_mean ?? sm.stias_pre_mean)}${td(sm.tia_pre_trust_mean)}${td(sm.tia_pre_distrust_mean)}
       ${td(comp, "gs")}
@@ -812,14 +837,133 @@ function save(name, cols, rows){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 function stampNow(){ const d = new Date(), p = x => String(x).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; }
-const TL_COLS = ["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0","trial","item_id",
+const TL_COLS = ["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","check_status","analysis_ok","T0","trial","item_id",
   "left_base","left_delay_pct","left_penalty","right_base","right_delay_pct","right_penalty",
   "H","rt_H","rt_H_first","A","rt_A","rt_A_first","D","D_schedule_error","left_delay","right_delay","left_actual","right_actual","Y",
   "C","time_C","cum","T","rt_T","T_prev","F","F_wrong","EV_left","EV_right","H_correct","D_correct","C_correct","H_eq_F","H_eq_D",
   "R_model_H","R_real_C","integrity","resumed","net_cue_ms","net_out_ms","ts_cue","ts_H","ts_A","ts_result","ts_T"];
+/* ====================== v8.18 내보내기 검증 ======================
+   각 회차 기록이 '바로 그 세션'의 것인지 확인한 뒤에만 CSV에 넣고, 참가자마다 점검 결과를 붙임.
+   ① 회차 기록 하나하나: 문서 번호=회차 번호, 템플릿·문항이 세션과 같음, 표시 시각(ts_cue, 기기 시계를 서버 시계로 보정)이 세션 시간 범위 안
+      (세션 시작 = 서버 배정 시각 created_at − 10분, 끝 = 결과 문서 서버 시각(완료) 또는 지금 + 30분). 어긋난 기록은 빼고 '제외 회차'에 사유를 적음.
+      단, 모든 회차가 시간만 어긋나면 기기 시계 문제로 보고 빼지 않고 경고만 남김.
+   ② 같은 회차 번호가 둘 이상 남으면 표시 시각이 가장 늦은 것을 쓰고 경고.
+   ③ 참가자: 회차가 1부터 빠짐없이 이어짐, 완료자는 정확히 20회, 회차 시각 순서·누적 배송시간 연결, integrity 모두 ok,
+      참가자가 보낸 요약(T_mean·A_rate·A_rate_1_10·A_rate_11_20·T_final·trials_done·T0·회차별 H/A/T)과 서버 회차 기록이 일치,
+      같은 seq의 다른 완료 세션 없음. 하나라도 어긋나면 check_status = "점검 필요". */
+const CK_BEFORE = 10 * 60000, CK_AFTER = 30 * 60000;
+let SEQG = null;
+function seqGroups(){ const g = {}; SESS.forEach(x => { if (isMain(x) && x.seq != null) (g[String(x.seq)] = g[String(x.seq)] || []).push(x); }); return g; }
+function integOf(s, k, x){
+  if (!STIM) return "";
+  const o = STIM.out[s.template + "/" + s.condition + "/" + tid(k)] || {};
+  if (!("T" in x)) return "incomplete";
+  const expC = x.A === undefined ? undefined : (x.A === 0 ? x.H : o.D), expTime = expC === 0 ? o.left_actual : o.right_actual;
+  return x.D === o.D && x.C === expC && x.time_C === expTime ? "ok" : "MISMATCH";
+}
+const numEq = (a, b) => { const A = a === "" || a == null ? "" : Number(a), B = b === "" || b == null ? "" : Number(b); return A === "" || B === "" ? A === B : Math.abs(A - B) < 1e-3; };
+function checkSession(s){
+  if (CHECK.has(s.uid)) return CHECK.get(s.uid);
+  if (!CHECK.size || !SEQG) SEQG = seqGroups();
+  const err = [], warn = [], excl = [], docs = TRIALS[s.uid] || {}, p = partOf(s) || null, sm = p && p.summary ? p.summary : null;
+  const start = tsMs(s.created_at), fin = p ? tsMs(p.created_at) : NaN, c0 = Date.parse(s.ts_T0 || "");
+  // 본실험 세션은 T0 응답 직후 서버가 배정 시각(created_at)을 적으므로, T0의 기기 시각과의 차이 = 기기 시계 차이. 파일럿(이전 방식)은 그렇지 않아 보정·제외하지 않고 경고만 함
+  const main = isMain(s), offKnown = main && Number.isFinite(start) && Number.isFinite(c0), off = offKnown ? start - c0 : 0;   // 서버 시계 − 기기 시계(ms)
+  const end = Number.isFinite(fin) ? fin : Date.now();
+  const hard = [], timeOnly = [], good = [];
+  for (const [id, x] of Object.entries(docs)) {
+    const k = Number(x && x.trial), why = [];
+    if (!/^t\d\d$/.test(id) || !Number.isInteger(k) || k < 1 || k > 20 || tid(k) !== id) why.push(`번호 불일치(${id}/${x && x.trial})`);
+    if (x.template !== undefined && x.template !== s.template) why.push(`템플릿 다름(${x.template})`);
+    if (STIM && Number.isInteger(k)) { const cu = STIM.cues[s.template + "/" + tid(k)]; if (cu && x.item_id !== undefined && cu.item_id !== x.item_id) why.push(`문항 다름(${x.item_id})`); }
+    const tc = Date.parse(x.ts_cue || ""), a = tc + off;
+    const outT = Number.isFinite(tc) && Number.isFinite(start) && (a < start - CK_BEFORE || a > end + CK_AFTER);
+    const item = { id, k, x, tc, ts_cue: x.ts_cue || "", tmin: Number.isFinite(tc) && Number.isFinite(start) ? Math.round((a - start) / 60000) : "" };
+    if (why.length) { item.why = why.join("·") + (outT ? `·세션 시간 밖(${item.tmin}분)` : ""); hard.push(item); }
+    else if (outT) { item.why = `세션 시간 밖(시작 기준 ${item.tmin}분)`; timeOnly.push(item); }
+    else good.push(item);
+  }
+  if (timeOnly.length && !main) { warn.push(`파일럿 세션: 회차 ${timeOnly.length}개 시각이 세션 시간 밖(제외하지 않음)`); good.push(...timeOnly); }
+  else if (timeOnly.length && !good.length && !hard.length) { warn.push(`모든 회차 시각이 세션 시간 밖(기기 시계 문제로 보고 그대로 사용)`); good.push(...timeOnly); }
+  else excl.push(...timeOnly);
+  excl.push(...hard);
+  if (excl.length) err.push(`제외한 회차 기록 ${excl.length}개(${excl.map(e => `${e.id}:${e.why}`).join(", ")})`);
+  if (main && !offKnown && Object.keys(docs).length) warn.push("T0 시각이 없어 기기 시계 보정 없이 시간 범위를 확인함");
+  // ② 같은 회차 번호 중복 → 가장 늦은 표시 시각
+  const acc = {}, byK = {};
+  good.forEach(g => (byK[g.k] = byK[g.k] || []).push(g));
+  for (const [k, gs] of Object.entries(byK)) { gs.sort((a, b) => (b.tc || 0) - (a.tc || 0)); acc[k] = gs[0].x;
+    if (gs.length > 1) { warn.push(`회차 ${k} 기록 ${gs.length}개 → 가장 늦은 것(${gs[0].id}) 사용`); gs.slice(1).forEach(g => excl.push(Object.assign({}, g, { why: "같은 회차의 더 이른 기록" }))); } }
+  // ③ 참가자 수준 점검
+  const ks = Object.keys(acc).map(Number).sort((a, b) => a - b), done = ks.filter(k => "T" in acc[k]);
+  const maxK = ks.length ? ks[ks.length - 1] : 0, miss = []; for (let k = 1; k <= maxK; k++) if (!acc[k]) miss.push(k);
+  if (miss.length) err.push(`빠진 회차(${miss.join(",")})`);
+  const noT = ks.filter(k => !("T" in acc[k]) && k !== maxK); if (noT.length) err.push(`신뢰 응답 없는 중간 회차(${noT.join(",")})`);
+  if (s.finished && done.length !== 20) err.push(`완료 세션인데 유효 회차 ${done.length}개(20개여야 함)`);
+  if (s.finished && !p) err.push("완료 세션인데 결과 문서가 없음");
+  for (let i = 1; i < ks.length; i++) { const k = ks[i], x = acc[k], pv = acc[k - 1]; if (!pv) continue;
+    if ("T" in x && "T" in pv && Number(x.cum) !== Number(pv.cum) + Number(x.time_C)) err.push(`누적 배송시간 연결 어긋남(${k - 1}→${k})`);
+    const a = Date.parse(x.ts_cue || ""), b = Date.parse(pv.ts_T || ""); if (Number.isFinite(a) && Number.isFinite(b) && a + 5000 < b) err.push(`회차 시각 순서 어긋남(${k - 1}→${k})`); }
+  if (acc[1] && "T" in acc[1] && Number(acc[1].cum) !== Number(acc[1].time_C)) err.push("1회차 누적 배송시간 어긋남");
+  const bad = done.filter(k => integOf(s, k, acc[k]) === "MISMATCH"); if (bad.length) err.push(`integrity 불일치(${bad.join(",")})`);
+  // 서버 회차 기록으로 다시 계산한 요약 ↔ 참가자가 보낸 요약
+  const mean = xs => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : "", r4 = x => x === "" ? "" : Math.round(x * 10000) / 10000;
+  const vals = (key, a = 1, b = 20) => done.filter(k => k >= a && k <= b).map(k => Number(acc[k][key]));
+  const srv = { trials_done: done.length, T_mean: r4(mean(vals("T"))), A_rate: r4(mean(vals("A"))), A_rate_1_10: r4(mean(vals("A", 1, 10))), A_rate_11_20: r4(mean(vals("A", 11, 20))),
+    T_final: done.length === 20 ? acc[20].T : "" };
+  if (sm) {
+    const diff = Object.keys(srv).filter(c => sm[c] !== undefined && !numEq(sm[c], srv[c]));
+    if (diff.length) err.push(`요약값 불일치(${diff.map(c => `${c}: 요약 ${sm[c]} / 서버 ${srv[c]}`).join(", ")})`);
+    if (sm.T0 !== undefined && s.T0 !== undefined && !numEq(sm.T0, s.T0)) err.push(`T0 불일치(요약 ${sm.T0} / 서버 ${s.T0})`);
+    const tv = []; for (let k = 1; k <= 20; k++) for (const v of ["H", "A", "T"]) { const a = sm[v + "_" + k]; if (a === undefined) continue; const b = acc[k] ? acc[k][v] : ""; if (!numEq(a, b)) tv.push(`${v}_${k}`); }
+    if (tv.length) err.push(`회차별 값 불일치 ${tv.length}개(${tv.slice(0, 12).join(",")}${tv.length > 12 ? "…" : ""})`);
+    if (sm.template !== undefined && sm.template !== s.template) err.push(`요약 템플릿 다름(${sm.template})`);
+    if (sm.condition !== undefined && sm.condition !== s.condition) err.push(`요약 조건 다름(${sm.condition})`);
+  } else if (p) warn.push("결과 문서에 요약이 없음");
+  if (p && p.seq != null && s.seq != null && Number(p.seq) !== Number(s.seq)) err.push(`결과 문서 seq 다름(${p.seq})`);
+  // 같은 seq
+  const grp = isMain(s) && s.seq != null ? (SEQG[String(s.seq)] || []) : [], vd = voidOf(s.uid);
+  const sl = ALLOC && ALLOC.slots ? ALLOC.slots[String(s.seq)] : null, owner = isMain(s) ? (sl ? Number(sl.u === s.uid) : "") : "";
+  if (grp.length > 1) warn.push(`같은 seq ${s.seq} 세션 ${grp.length}개(재발급·무효 처리 이력, 이 세션은 ${owner === 1 ? "현재 배정자" : "이전 배정자"})`);
+  if (s.finished && !vd && grp.some(o => o.uid !== s.uid && o.finished && !voidOf(o.uid))) err.push(`같은 seq ${s.seq}를 다른 완료 세션과 함께 가짐`);
+  if (vd) warn.push(`무효 처리됨(${vd})`);
+  if (isTest(s.pid)) warn.push("시험 참가(뒷자리 0000)");
+  const r = { acc, excl, err, warn, srv, owner, grpN: grp.length, nDocs: Object.keys(docs).length, nValid: done.length,
+    status: err.length ? "점검 필요" : "ok", off_s: offKnown ? Math.round(off / 1000) : "",
+    analysis_ok: isMain(s) && !isTest(s.pid) && s.finished && !vd && !err.length ? 1 : 0 };
+  if (STIM) CHECK.set(s.uid, r);
+  return r;
+}
+function checkCols(s){
+  const c = checkSession(s);
+  return { check_status: c.status, analysis_ok: c.analysis_ok, check_errors: c.err.join(" | "), check_warnings: c.warn.join(" | "),
+    trial_docs_n: c.nDocs, trials_valid_n: c.nValid, trials_excluded_n: c.excl.length, excluded_trials: c.excl.map(e => `${e.id}(${e.why}; ts_cue=${e.ts_cue})`).join(" | "),
+    seq_sessions_n: c.grpN || "", seq_owner: c.owner, clock_offset_s: c.off_s };
+}
+const CHECK_COLS = ["check_status","analysis_ok","check_errors","check_warnings","trial_docs_n","trials_valid_n","trials_excluded_n","excluded_trials","seq_sessions_n","seq_owner","clock_offset_s"];
+/* 내보내기 준비: 자극 자료 + 서버에서 회차 기록 새로 읽기 + 검증 */
+async function prepExport(btn, label){
+  if (!STIM) STIM = await loadStimFromServer();
+  // 세션·결과 문서·배정표도 내보내기 직전에 서버에서 새로 읽음(화면을 연 뒤 바뀐 것까지 반영)
+  btn.textContent = "서버에서 세션·결과 문서 다시 읽는 중…";
+  const [ps, sq] = await Promise.all([getDocs(query(collection(db, "participants"), orderBy("created_at", "desc"))), getDocs(collection(db, "sessions"))]);
+  READS += Math.max(1, ps.size) + Math.max(1, sq.size);
+  PARTS = ps.docs.map(d => ({ id: d.id, ...d.data() })); SESS = sq.docs.map(d => ({ uid: d.id, ...d.data() }));
+  await loadAlloc(); CHECK.clear(); SEQG = null;
+  const ss = visibleSess();
+  const r = await freshTrials(ss, (a, b) => { btn.textContent = `서버에서 회차 기록 다시 읽는 중… ${a}/${b}`; });
+  SEQG = null; ss.forEach(checkSession); render();
+  const need = ss.filter(s => checkSession(s).status !== "ok");
+  const note = (r.changed.length ? ` 이 브라우저 보관본과 서버가 달랐던 세션 ${r.changed.length}개는 서버 기록으로 바로잡았습니다(${r.changed.slice(0, 8).map(s => isMain(s) ? "seq " + s.seq : "P" + s.slot).join(", ")}${r.changed.length > 8 ? " 외" : ""}).` : "") +
+    (need.length ? ` 점검 필요 ${need.length}개: ${need.slice(0, 10).map(s => `${isMain(s) ? "seq " + s.seq : "P" + s.slot}(${s.pid})`).join(", ")}${need.length > 10 ? " 외" : ""} — '점검 보고서 CSV'에서 사유를 확인하세요.` : " 모든 세션이 검증을 통과했습니다.");
+  return { ss, need, note, reads: r.reads };
+}
+
 /* 한 참가자(세션)의 회차 자료 행(최대 20행) — 회차 자료 CSV와 전체(total) CSV가 함께 사용 */
 function trialRowsFor(s){
-  const rows = [], { n, status } = sessStatus(s), tr = TRIALS[s.uid] || {};
+  // v8.18: 검증을 통과한 회차 기록(바로 이 세션의 것)만 사용
+  const rows = [], ck = checkSession(s), { status } = sessStatus(s), n = ck.nValid, tr = {}; Object.entries(ck.acc).forEach(([k, x]) => tr[tid(Number(k))] = x);
+  const cc = { check_status: ck.status, analysis_ok: ck.analysis_ok };
   for (let k = 1; k <= 20; k++) {
         const t = tid(k), x = tr[t]; if (!x) continue;
         const cu = STIM.cues[s.template + "/" + t] || {}, o = STIM.out[s.template + "/" + s.condition + "/" + t] || {}, rs = STIM.res[s.template + "/" + t] || {};
@@ -828,7 +972,7 @@ function trialRowsFor(s){
         const integrity = !has ? "incomplete" : (x.D === o.D && x.C === expC && x.time_C === expTime ? "ok" : "MISMATCH");
         const prevT = k === 1 ? s.T0 : (tr[tid(k - 1)] || {}).T;
         rows.push(Object.assign({ uid: s.uid, pid: s.pid, phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", slot: s.slot ?? "", cell: s.cell ?? "", condition: s.condition, template: s.template, app_version: s.app_version, view: s.view ?? "",
-          comp_passed: s.comp_passed ?? "", session_status: status, trials_done: n, T0: s.T0 }, cu, x, {
+          comp_passed: s.comp_passed ?? "", session_status: status, trials_done: n, T0: s.T0 }, cc, cu, x, {
           D: has ? x.D : "", D_schedule_error: o.D === undefined ? "" : Number(o.D !== o.Y),
           left_delay: has ? o.left_delay : "", right_delay: has ? o.right_delay : "", left_actual: has ? o.left_actual : "", right_actual: has ? o.right_actual : "", Y: has ? o.Y : "",
           T_prev: prevT ?? "", F: rs.F, F_wrong: rs.F_wrong, EV_left: rs.EV_left, EV_right: rs.EV_right,
@@ -842,21 +986,18 @@ function trialRowsFor(s){
 $('b-dl-trials').onclick = async () => {
   const btn = $('b-dl-trials'); btn.disabled = true; btn.textContent = "만드는 중…";
   try {
-    if (!STIM) STIM = await loadStimFromServer();
+    const pr = await prepExport(btn);
     const rows = [];
-    for (const s of visibleSess()) {
-      rows.push(...trialRowsFor(s));
-
-    }
+    for (const s of pr.ss) rows.push(...trialRowsFor(s));
     save(`trials_long_${stampNow()}.csv`, TL_COLS, rows);
     const mm = rows.filter(r => r.integrity === "MISMATCH").length;
-    msg('data-msg', mm ? "err" : "ok", `회차 ${rows.length}행을 받았습니다.${mm ? ` 검증 불일치 ${mm}행이 있습니다(integrity=MISMATCH).` : ""}`);
+    msg('data-msg', mm || pr.need.length ? "err" : "ok", `회차 ${rows.length}행을 받았습니다(서버에서 새로 읽음 ${pr.reads.toLocaleString("ko-KR")}건).${mm ? ` 검증 불일치 ${mm}행(integrity=MISMATCH).` : ""}${pr.note}`);
   } catch (e) { msg('data-msg', "err", `만들지 못했습니다 (${e.code || e.message}).`); }
   finally { btn.disabled = false; btn.textContent = "회차 자료(trials_long) CSV"; }
 };
 $('b-dl-sess').onclick = () => {
   const cols = ["uid","pid","phone","phase","seq","alloc","alloc_table","table_seq","alloc_void","slot","cell","condition","template","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","assign_reused","created_at","T0","trials_done","status","finished"];
-  save(`sessions_${stampNow()}.csv`, cols, visibleSess().map(s => { const { n, status } = sessStatus(s);
+  save(`sessions_${stampNow()}.csv`, cols, visibleSess().map(s => { const { status } = sessStatus(s), n = STIM ? checkSession(s).nValid : sessStatus(s).n;
     return { ...s, alloc_void: voidOf(s.uid), alloc_table: isMain(s) ? tableOf(s.seq).table : "", table_seq: isMain(s) ? tableOf(s.seq).tseq : "", phase: isMain(s) ? "main" : "pilot", phone: (partOf(s) || {}).phone || "", created_at: tsIso(s.created_at), trials_done: n, status, finished: s.finished ? 1 : 0 }; }));
 };
 $('b-dl-sum').onclick = () => {
@@ -874,8 +1015,8 @@ $('b-dl-ev').onclick = () => {
 };
 /* ====================== 전체(total) CSV ====================== */
 const SESS_COLS = ["uid","pid","phone","phase","seq","alloc","alloc_table","table_seq","alloc_void","slot","cell","condition","template","assign_reused","app_version","device","os_name","browser","screen_w","screen_h","orientation","view","comp_passed","stim_sha",
-  "visit_ts_server","created_at","finished_ts_server","dur_server_s","assign_to_finish_s","session_status","trials_done","finished","T0","rt_T0","ts_T0"];
-const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","T0"].includes(c));
+  "visit_ts_server","created_at","finished_ts_server","dur_server_s","assign_to_finish_s","session_status","trials_done","finished",...CHECK_COLS,"T0","rt_T0","ts_T0"];
+const TRIAL_ONLY = TL_COLS.filter(c => !["uid","pid","phase","seq","slot","cell","condition","template","app_version","view","comp_passed","session_status","trials_done","check_status","analysis_ok","T0"].includes(c));
 function parseEvents(csv){
   const lines = String(csv || "").replace(/^﻿/, "").split("\r\n").filter(Boolean); if (lines.length < 2) return [];
   const split = l => { const out = []; let cur = "", q = false; for (let i = 0; i < l.length; i++) { const ch = l[i];
@@ -908,7 +1049,7 @@ function totalRows(){
     view: s.view ?? "", comp_passed: s.comp_passed ?? "", stim_sha: s.stim_sha ?? "",
     visit_ts_server: tsIso(v.ts), created_at: tsIso(s.created_at), finished_ts_server: tsIso(p.created_at),
     dur_server_s: Number.isFinite(vt) && Number.isFinite(ft) ? Math.round((ft - vt) / 1000) : "", assign_to_finish_s: Number.isFinite(at) && Number.isFinite(ft) ? Math.round((ft - at) / 1000) : "",
-    session_status: status, trials_done: n, finished: s.finished ? 1 : 0,
+    session_status: status, trials_done: checkSession(s).nValid, finished: s.finished ? 1 : 0, ...checkCols(s),
     T0: s.T0 ?? "", rt_T0: s.rt_T0 ?? "", ts_T0: s.ts_T0 ?? "" }; };
   const partRec = p => { const sm = Object.assign({}, p.summary || {}); Object.keys(sm).forEach(k => { if (/^(H|A|T)_\d+$/.test(k)) delete sm[k]; });   // 회차별 값은 각 줄의 회차 열에 있음
     return Object.assign({ participant_doc: p.id || "", has_summary: p.summary ? 1 : 0 }, sm, eventSummary(p)); };
@@ -920,7 +1061,7 @@ function totalRows(){
     trs.forEach(t => { const o = Object.assign({}, base); TRIAL_ONLY.forEach(c => o[c] = t[c]); rows.push(o); });
   }
   // 세션 없이 결과 문서만 있는 경우(예전 버전 등)도 빠짐없이
-  for (const p of visibleParts()) if (!usedParts.has(p.id)) rows.push(Object.assign({}, partRec(p), { uid: p.uid ?? "", pid: p.pid, phone: p.phone ?? "", condition: p.condition ?? "", template: p.template ?? "", app_version: p.app_version ?? "", session_status: "세션 없음" }));
+  for (const p of visibleParts()) if (!usedParts.has(p.id)) rows.push(Object.assign({}, partRec(p), { uid: p.uid ?? "", pid: p.pid, phone: p.phone ?? "", condition: p.condition ?? "", template: p.template ?? "", app_version: p.app_version ?? "", session_status: "세션 없음", check_status: "점검 필요", analysis_ok: 0, check_errors: "세션 문서 없음(결과 문서만 있음)" }));
   return rows;
 }
 function totalCols(rows){
@@ -933,14 +1074,38 @@ function totalCols(rows){
 $('b-dl-total').onclick = async () => {
   const btn = $('b-dl-total'); btn.disabled = true; btn.textContent = "만드는 중…";
   try {
-    if (!STIM) STIM = await loadStimFromServer();
+    const pr = await prepExport(btn);
     const rows = totalRows(); if (!rows.length) return msg('data-msg', "info", "내보낼 기록이 없습니다. 필터를 확인하세요.");
     const cols = totalCols(rows);
     save(`total_${stampNow()}.csv`, cols, rows);
     const people = new Set(rows.map(r => r.uid || r.participant_doc)).size, mm = rows.filter(r => r.integrity === "MISMATCH").length;
-    msg('data-msg', mm ? "err" : "ok", `전체(total) CSV: 참가자 ${people}명, ${rows.length}줄, ${cols.length}열을 받았습니다.${mm ? ` 검증 불일치 ${mm}줄(integrity=MISMATCH)이 있습니다.` : ""}`);
+    const ok = new Set(rows.filter(r => Number(r.analysis_ok) === 1).map(r => r.uid)).size;
+    msg('data-msg', mm || pr.need.length ? "err" : "ok", `전체(total) CSV: 참가자 ${people}명(분석 포함 가능 analysis_ok=1: ${ok}명), ${rows.length}줄, ${cols.length}열을 받았습니다(서버에서 새로 읽음 ${pr.reads.toLocaleString("ko-KR")}건).${mm ? ` 검증 불일치 ${mm}줄(integrity=MISMATCH).` : ""}${pr.note}`);
   } catch (e) { msg('data-msg', "err", `만들지 못했습니다 (${e.code || e.message}).`); }
   finally { btn.disabled = false; btn.textContent = "전체(total) CSV"; }
+};
+/* v8.18: 점검 보고서 — 세션마다 1줄(서버 회차 문서 수, 유효·제외 회차, 요약 대조, 같은 seq 세션) + 제외한 회차 기록마다 1줄 */
+$('b-dl-check').onclick = async () => {
+  const btn = $('b-dl-check'); btn.disabled = true; btn.textContent = "만드는 중…";
+  try {
+    const pr = await prepExport(btn);
+    const cols = ["row_type","uid","pid","phase","seq","slot","condition","template","app_version","session_status","finished","alloc_void",...CHECK_COLS,
+      "summary_trials_done","server_trials_done","summary_T_mean","server_T_mean","summary_A_rate","server_A_rate","summary_A_rate_1_10","server_A_rate_1_10","summary_A_rate_11_20","server_A_rate_11_20","summary_T_final","server_T_final",
+      "excluded_doc","excluded_trial","excluded_reason","excluded_ts_cue","excluded_H","excluded_A","excluded_T"];
+    const rows = [];
+    for (const s of pr.ss) { const c = checkSession(s), sm = (partOf(s) || {}).summary || {}, { status } = sessStatus(s);
+      const base = { uid: s.uid, pid: s.pid, phase: isMain(s) ? "main" : "pilot", seq: s.seq ?? "", slot: s.slot ?? "", condition: s.condition, template: s.template, app_version: s.app_version, session_status: status, finished: s.finished ? 1 : 0, alloc_void: voidOf(s.uid) };
+      const o = Object.assign({ row_type: "session" }, base, checkCols(s));
+      for (const k of ["trials_done","T_mean","A_rate","A_rate_1_10","A_rate_11_20","T_final"]) { o["summary_" + k] = sm[k] ?? ""; o["server_" + k] = c.srv[k]; }
+      rows.push(o);
+      c.excl.forEach(e => rows.push(Object.assign({ row_type: "excluded_trial" }, base, { check_status: c.status, excluded_doc: e.id, excluded_trial: e.k, excluded_reason: e.why, excluded_ts_cue: e.ts_cue,
+        excluded_H: e.x ? e.x.H ?? "" : "", excluded_A: e.x ? e.x.A ?? "" : "", excluded_T: e.x ? e.x.T ?? "" : "" })));
+    }
+    rows.sort((a, b) => (a.check_status === "ok") - (b.check_status === "ok"));
+    save(`check_report_${stampNow()}.csv`, cols, rows);
+    msg('data-msg', pr.need.length ? "err" : "ok", `점검 보고서: 세션 ${pr.ss.length}개(서버에서 새로 읽음 ${pr.reads.toLocaleString("ko-KR")}건).${pr.note}`);
+  } catch (e) { msg('data-msg', "err", `만들지 못했습니다 (${e.code || e.message}).`); }
+  finally { btn.disabled = false; btn.textContent = "점검 보고서 CSV"; }
 };
 /* 열 설명(코드북) */
 const CB = Object.assign({}, {
@@ -950,7 +1115,14 @@ const CB = Object.assign({}, {
   os_name: "운영체제(windows/macos/ios/android/chromeos/linux)", browser: "브라우저", screen_w: "화면 폭(px)", screen_h: "화면 높이(px)", orientation: "배정 시 화면 방향(portrait/landscape)",
   visit_ts_server: "첫 방문 시각(서버, UTC)", finished_ts_server: "결과 저장 시각(서버, UTC)", dur_server_s: "총 소요시간(초, 서버 기준: 첫 방문~결과 저장)", assign_to_finish_s: "배정~결과 저장(초, 서버 기준)", condition: "조건: early=초기 오류(2·4·7·9회), late=후기 오류(12·14·17·19회), control=무오류", template: "단서 템플릿", assign_reused: "중도 이탈 자리 재배정(1)",
   app_version: "앱 버전", device: "기기(pc/mobile/tablet)", view: "화면 방식(3d/2d/3d_then_2d)", comp_passed: "이해 확인 통과(1)/해설 후 진행(0)", stim_sha: "단서 자료 확인값",
-  created_at: "배정 시각(서버, UTC). 본실험은 T0 응답 직후", session_status: "완료/진행 중/중도 이탈", trials_done: "완료 회차 수", finished: "완료(1)", T0: "시작 전 신뢰(0~100)", rt_T0: "T0 응답시간(ms)", ts_T0: "T0 응답 시각",
+  created_at: "배정 시각(서버, UTC). 본실험은 T0 응답 직후", session_status: "완료/진행 중/중도 이탈", trials_done: "완료 회차 수(v8.18부터 검증을 통과한 서버 회차 기록 기준)", finished: "완료(1)",
+  check_status: "내보내기 검증 결과(v8.18): ok / 점검 필요. 회차 기록이 이 세션의 것인지(번호·템플릿·문항·세션 시간 범위), 회차가 빠짐없는지(완료자는 정확히 20회), 시각 순서·누적시간 연결, integrity, 참가자 요약값(T_mean·A_rate 등)·회차별 H/A/T와 서버 기록 일치, 같은 seq의 다른 완료 세션 여부를 확인",
+  analysis_ok: "분석 포함 가능(1): 본실험·시험(0000) 아님·완료·무효 처리 안 됨·check_status=ok. 0이면 check_errors와 세션 상태를 보고 판단",
+  check_errors: "점검 필요 사유(여럿이면 | 로 구분)", check_warnings: "참고 사항(점검 결과에는 영향 없음): 같은 seq 재발급 이력, 무효 처리, 시험 참가, 기기 시계 등",
+  trial_docs_n: "서버에 있는 이 세션의 회차 기록 문서 수(내보내기 직전 서버에서 새로 읽음)", trials_valid_n: "검증을 통과해 CSV에 넣은 회차 수(신뢰 응답까지 마친 회차)",
+  trials_excluded_n: "검증에서 빠진 회차 기록 수(이 세션의 것이 아니라고 판단)", excluded_trials: "빠진 회차 기록과 사유·표시 시각(점검 보고서 CSV에 한 줄씩 자세히)",
+  seq_sessions_n: "같은 seq를 가진 본실험 세션 수(2 이상 = 재발급·무효 처리 이력)", seq_owner: "현재 배정표에서 이 seq의 배정자(1) / 이전 배정자(0)",
+  clock_offset_s: "서버 시계 − 참가자 기기 시계(초, T0 시각으로 추정). 세션 시간 범위 확인에 보정값으로 사용", T0: "시작 전 신뢰(0~100)", rt_T0: "T0 응답시간(ms)", ts_T0: "T0 응답 시각",
   events_n: "진행 기록 수", practice_H_1: "연습1 선택(0=왼,1=오)", practice_rt_1: "연습1 확정까지 시간(ms)", practice_H_2: "연습2 선택", practice_rt_2: "연습2 확정까지 시간(ms)",
   comp_rt_1: "이해 확인 1차 소요(ms)", comp_rt_2: "이해 확인 2차 소요(ms)", back_pressed_n: "뒤로 가기 누른 횟수", visibility_hidden_n: "다른 앱·탭으로 벗어난 기록 수", net_error_n: "연결 오류 수", error_n: "처리 오류 수",
   gl_events: "3D 관련 기록(2D 전환 이유 등)", resumed_events_n: "이어하기 기록 수", first_event_ts: "첫 기록 시각", last_event_ts: "마지막 기록 시각",
